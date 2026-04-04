@@ -1,0 +1,10 @@
+.env
+venv/
+data/
+temp/
+uploads/
+__pycache__/
+*.pyc
+.git/
+.DS_Store
+PLAN.md
