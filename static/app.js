@@ -1307,23 +1307,41 @@ function setupChat() {
     // Tooltip click → open chat with selected text
     document.getElementById('sel-tooltip').addEventListener('click', () => {
         document.getElementById('sel-tooltip').classList.add('hidden');
-        openChatPanel(`Ask about: "${selectedTextForChat.slice(0,60)}..."`);
+        if (_selectionFromFullscreen) {
+            openFsChat(selectedTextForChat);
+        } else {
+            openChatPanel(`Ask about: "${selectedTextForChat.slice(0,60)}..."`);
+        }
+    });
+
+    // Fullscreen Ask AI button
+    document.getElementById('fs-ask-ai').addEventListener('click', () => openFsChat());
+    document.getElementById('fs-chat-close').addEventListener('click', () => {
+        document.getElementById('fs-chat-panel').classList.add('hidden');
+    });
+    document.getElementById('fs-chat-send').addEventListener('click', sendFsChatMessage);
+    document.getElementById('fs-chat-input').addEventListener('keydown', e => {
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendFsChatMessage(); }
     });
 }
+
+let _selectionFromFullscreen = false;
 
 function handleTextSelection() {
     const sel = window.getSelection();
     const text = sel.toString().trim();
     const tooltip = document.getElementById('sel-tooltip');
 
-    // Only show tooltip if text selected inside history-body or result-body
     if (text.length > 5 && sel.rangeCount > 0) {
         const range = sel.getRangeAt(0);
         const container = range.commonAncestorContainer;
         const isInReader = container.closest?.('#history-body') || container.parentElement?.closest?.('#history-body') ||
                            container.closest?.('#result-body') || container.parentElement?.closest?.('#result-body');
-        if (isInReader && currentHistoryId) {
+        const isInFS = container.closest?.('#fs-body') || container.parentElement?.closest?.('#fs-body');
+
+        if ((isInReader || isInFS) && currentHistoryId) {
             selectedTextForChat = text.slice(0, 500);
+            _selectionFromFullscreen = !!isInFS;
             const rect = range.getBoundingClientRect();
             tooltip.style.top = (rect.top - 45) + 'px';
             tooltip.style.left = (rect.left + rect.width / 2 - 80) + 'px';
@@ -1592,7 +1610,94 @@ function openFullscreenReader(html) {
 
 function closeFullscreenReader() {
     document.getElementById('fs-reader').classList.add('hidden');
+    document.getElementById('fs-chat-panel').classList.add('hidden');
     document.body.style.overflow = '';
+}
+
+// ==================== Fullscreen Chat ====================
+let fsChatMessages = [];
+
+function openFsChat(selectedText) {
+    fsChatMessages = [];
+    const panel = document.getElementById('fs-chat-panel');
+    panel.classList.remove('hidden');
+    document.getElementById('fs-chat-selection').textContent = selectedText ? `"${selectedText.slice(0, 50)}..."` : '';
+    document.getElementById('fs-chat-messages').innerHTML = `
+        <div class="text-center py-6">
+            <div class="w-10 h-10 rounded-full gradient-btn flex items-center justify-center mx-auto mb-2">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+            </div>
+            <p class="text-sm text-gray-400">${selectedText ? 'Ask about the selected text' : 'Ask anything about this content'}</p>
+        </div>`;
+    document.getElementById('fs-chat-input').value = '';
+    document.getElementById('fs-chat-input').focus();
+
+    // Store selected text for context
+    if (selectedText) fsChatMessages._selectedText = selectedText;
+}
+
+async function sendFsChatMessage() {
+    const input = document.getElementById('fs-chat-input');
+    const msg = input.value.trim();
+    if (!msg || !currentHistoryId) return;
+
+    fsChatMessages.push({role: 'user', content: msg});
+    input.value = '';
+    renderFsChatMessages(true);
+
+    try {
+        // Create or continue chat via the history chat API
+        const body = {message: msg};
+        if (fsChatMessages._selectedText) {
+            body.selected_text = fsChatMessages._selectedText;
+        }
+
+        if (!fsChatMessages._chatId) {
+            // Create new chat
+            const resp = await fetch(`/api/history/${currentHistoryId}/chats`, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(body),
+            });
+            if (!resp.ok) { const e = await resp.json(); throw new Error(e.detail || 'Failed'); }
+            const data = await resp.json();
+            fsChatMessages._chatId = data.chat_id;
+            fsChatMessages.push({role: 'assistant', content: data.messages[data.messages.length - 1].content});
+        } else {
+            // Continue existing chat
+            const resp = await fetch(`/api/chats/${fsChatMessages._chatId}/message`, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({message: msg}),
+            });
+            if (!resp.ok) { const e = await resp.json(); throw new Error(e.detail || 'Failed'); }
+            const data = await resp.json();
+            fsChatMessages.push({role: 'assistant', content: data.messages[data.messages.length - 1].content});
+        }
+        // Clear selected text after first message
+        delete fsChatMessages._selectedText;
+    } catch (err) {
+        fsChatMessages.push({role: 'assistant', content: `**Error:** ${err.message}`});
+    }
+    renderFsChatMessages();
+}
+
+function renderFsChatMessages(showLoading = false) {
+    const container = document.getElementById('fs-chat-messages');
+    const msgs = fsChatMessages.filter(m => m.role);
+    let html = msgs.map(m => {
+        if (m.role === 'user') {
+            return `<div class="flex justify-end"><div class="msg-user px-4 py-3 max-w-[85%] text-sm">${esc(m.content)}</div></div>`;
+        }
+        return `<div class="flex justify-start"><div class="msg-ai bg-gray-100 dark:bg-gray-800 px-4 py-3 max-w-[85%] text-sm prose dark:text-gray-200 rounded-2xl">${renderMd(m.content)}</div></div>`;
+    }).join('');
+    if (showLoading) {
+        html += `<div class="flex justify-start"><div class="msg-ai bg-gray-100 dark:bg-gray-800 px-4 py-3 text-sm rounded-2xl">
+            <span class="inline-block w-2 h-2 bg-brand-500 rounded-full animate-bounce mr-1"></span>
+            <span class="inline-block w-2 h-2 bg-brand-500 rounded-full animate-bounce mr-1" style="animation-delay:0.15s"></span>
+            <span class="inline-block w-2 h-2 bg-brand-500 rounded-full animate-bounce" style="animation-delay:0.3s"></span>
+        </div></div>`;
+    }
+    container.innerHTML = html;
+    container.scrollTop = container.scrollHeight;
 }
 
 // ==================== YouTube Embed ====================
