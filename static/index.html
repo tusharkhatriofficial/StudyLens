@@ -383,6 +383,10 @@
                                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
                                     Download
                                 </button>
+                                <button id="result-voice-btn" class="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg border border-gray-200/60 dark:border-white/[0.08] text-gray-500 dark:text-gray-400 hover:border-brand-500 hover:text-brand-500 transition-colors glass-card">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 010 14.14M15.54 8.46a5 5 0 010 7.07"/></svg>
+                                    <span class="voice-label">Listen</span>
+                                </button>
                                 <button id="expand-btn" class="expand-reader-btn flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg border border-gray-200/60 dark:border-white/[0.08] text-gray-500 dark:text-gray-400 hover:border-brand-500 hover:text-brand-500 transition-colors glass-card" data-source="result-body">
                                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
                                     Expand
@@ -500,6 +504,10 @@
                             <button class="hist-download flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200/60 dark:border-white/[0.08] text-gray-500 dark:text-gray-400 hover:border-brand-500 hover:text-brand-500 transition-colors glass-card">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
                                 Download
+                            </button>
+                            <button id="voice-btn" class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200/60 dark:border-white/[0.08] text-gray-500 dark:text-gray-400 hover:border-brand-500 hover:text-brand-500 transition-colors glass-card">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 010 14.14M15.54 8.46a5 5 0 010 7.07"/></svg>
+                                <span class="voice-label">Listen</span>
                             </button>
                             <button id="hist-expand-btn" class="expand-reader-btn flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200/60 dark:border-white/[0.08] text-gray-500 dark:text-gray-400 hover:border-brand-500 hover:text-brand-500 transition-colors glass-card" data-source="history-body">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
@@ -625,6 +633,10 @@
                     <span id="fs-zoom-label" class="w-12 text-center text-sm font-semibold text-gray-600 dark:text-gray-300 tabular-nums select-none">100%</span>
                     <button id="fs-zoom-in" class="w-8 h-8 flex items-center justify-center rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/[0.06] hover:text-gray-700 dark:hover:text-gray-200 transition-colors text-lg font-bold">+</button>
                 </div>
+                <button id="fs-voice-btn" class="flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg border border-gray-200/60 dark:border-white/[0.08] text-gray-500 dark:text-gray-400 hover:border-brand-500 hover:text-brand-500 transition-colors">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 010 14.14M15.54 8.46a5 5 0 010 7.07"/></svg>
+                    <span class="voice-label">Listen</span>
+                </button>
                 <button id="fs-ask-ai" class="flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg gradient-btn text-white hover:shadow-lg hover:shadow-brand-500/20 transition-all">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
                     Ask AI
@@ -759,6 +771,6 @@
         <div id="tour-highlight" class="absolute z-[5] border-2 border-brand-400 rounded-2xl shadow-[0_0_0_4000px_rgba(0,0,0,0.55)] pointer-events-none transition-all duration-300" style="display:none"></div>
     </div>
 
-    <script src="/static/app.js?v=19"></script>
+    <script src="/static/app.js?v=20"></script>
 </body>
 </html>

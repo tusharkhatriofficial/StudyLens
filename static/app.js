@@ -21,6 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupTour();
     setupExpand();
     setupBatchQueue();
+    setupVoice();
     resumeActiveTasks();
 });
 
@@ -437,6 +438,7 @@ function showTimeSaved(tabContainerId, outputs, videoDuration) {
 }
 
 function renderContent(bodyId, key, outputs) {
+    if (ttsPlaying) stopVoice();
     const body = document.getElementById(bodyId);
     currentTab = key;
     if (key==='transcript' && outputs._segments?.length) {
@@ -1925,6 +1927,118 @@ function endTour() {
     document.getElementById('tour-overlay').classList.add('hidden');
     localStorage.setItem('studylens-toured', '1');
 }
+
+// ==================== Text-to-Speech ====================
+let ttsUtterance = null;
+let ttsPlaying = false;
+
+function setupVoice() {
+    document.getElementById('voice-btn')?.addEventListener('click', toggleVoice);
+    document.getElementById('fs-voice-btn')?.addEventListener('click', toggleVoice);
+    document.getElementById('result-voice-btn')?.addEventListener('click', toggleVoice);
+}
+
+function toggleVoice() {
+    if (ttsPlaying) {
+        stopVoice();
+        return;
+    }
+
+    // Get current tab's text content
+    const text = currentTab && rawOutputs[currentTab] ? rawOutputs[currentTab] : '';
+    if (!text) { alert('No content to read'); return; }
+
+    // Clean markdown for speech
+    const cleanText = text
+        .replace(/#{1,6}\s*/g, '')           // headings
+        .replace(/\*\*([^*]+)\*\*/g, '$1')   // bold
+        .replace(/\*([^*]+)\*/g, '$1')       // italic
+        .replace(/`([^`]+)`/g, '$1')         // inline code
+        .replace(/```[\s\S]*?```/g, '')      // code blocks
+        .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // links
+        .replace(/[-*+]\s/g, '')             // list markers
+        .replace(/\d+\.\s/g, '')             // numbered lists
+        .replace(/---/g, '')                 // horizontal rules
+        .replace(/\|[^\n]+\|/g, '')          // tables
+        .replace(/>\s/g, '')                 // blockquotes
+        .replace(/\n{3,}/g, '\n\n')          // excess newlines
+        .trim();
+
+    if (!cleanText) { alert('No readable content'); return; }
+
+    // Split into chunks (speechSynthesis has a ~200-300 char limit per utterance in some browsers)
+    const sentences = cleanText.match(/[^.!?\n]+[.!?\n]+|[^.!?\n]+$/g) || [cleanText];
+    const chunks = [];
+    let current = '';
+    for (const s of sentences) {
+        if ((current + s).length > 200) {
+            if (current) chunks.push(current.trim());
+            current = s;
+        } else {
+            current += s;
+        }
+    }
+    if (current.trim()) chunks.push(current.trim());
+
+    ttsPlaying = true;
+    updateVoiceButtons();
+
+    let chunkIndex = 0;
+
+    function speakNext() {
+        if (chunkIndex >= chunks.length || !ttsPlaying) {
+            stopVoice();
+            return;
+        }
+        ttsUtterance = new SpeechSynthesisUtterance(chunks[chunkIndex]);
+        ttsUtterance.rate = 0.95;
+        ttsUtterance.pitch = 1;
+
+        // Try to pick a good voice
+        const voices = speechSynthesis.getVoices();
+        const preferred = voices.find(v => v.name.includes('Samantha') || v.name.includes('Google') || v.name.includes('Microsoft') || (v.lang.startsWith('en') && v.localService));
+        if (preferred) ttsUtterance.voice = preferred;
+
+        ttsUtterance.onend = () => { chunkIndex++; speakNext(); };
+        ttsUtterance.onerror = () => { chunkIndex++; speakNext(); };
+        speechSynthesis.speak(ttsUtterance);
+    }
+
+    // Ensure voices are loaded
+    if (speechSynthesis.getVoices().length === 0) {
+        speechSynthesis.onvoiceschanged = () => speakNext();
+    } else {
+        speakNext();
+    }
+}
+
+function stopVoice() {
+    ttsPlaying = false;
+    speechSynthesis.cancel();
+    ttsUtterance = null;
+    updateVoiceButtons();
+}
+
+function updateVoiceButtons() {
+    document.querySelectorAll('.voice-label').forEach(el => {
+        el.textContent = ttsPlaying ? 'Stop' : 'Listen';
+    });
+    // Update button styling
+    ['voice-btn', 'fs-voice-btn', 'result-voice-btn'].forEach(id => {
+        const btn = document.getElementById(id);
+        if (btn) {
+            if (ttsPlaying) {
+                btn.classList.add('!border-brand-500', '!text-brand-500');
+            } else {
+                btn.classList.remove('!border-brand-500', '!text-brand-500');
+            }
+        }
+    });
+}
+
+// Stop voice when navigating away or closing fullscreen
+const _origCloseFS = closeFullscreenReader;
+closeFullscreenReader = function() { stopVoice(); _origCloseFS(); };
 
 // ==================== Batch Queue ====================
 let batchQueue = [];
