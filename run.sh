@@ -6,9 +6,29 @@ cd "$(dirname "$0")"
 # Check dependencies
 command -v ffmpeg >/dev/null 2>&1 || { echo "ERROR: ffmpeg not found. Install with: brew install ffmpeg"; exit 1; }
 
-if [ -z "$OPENAI_API_KEY" ]; then
-    echo "WARNING: OPENAI_API_KEY not set. Export it for AI-generated notes:"
-    echo "  export OPENAI_API_KEY=sk-..."
+# Check for .env file with at least one API key
+if [ -f ".env" ]; then
+    # Source .env to check keys (ignore comments and empty lines)
+    HAS_KEY=false
+    while IFS= read -r line; do
+        case "$line" in
+            OPENAI_API_KEY=*|GEMINI_API_KEY=*|ANTHROPIC_API_KEY=*)
+                val="${line#*=}"
+                if [ -n "$val" ] && [ "$val" != "sk-your-key-here" ] && [ "$val" != "your-gemini-key-here" ] && [ "$val" != "your-anthropic-key-here" ]; then
+                    HAS_KEY=true
+                fi
+                ;;
+        esac
+    done < .env
+    if [ "$HAS_KEY" = false ]; then
+        echo "WARNING: No API key found in .env"
+        echo "  Transcription will work, but AI features (summaries, quizzes, Q&A) need a key."
+        echo "  Run: cp .env.example .env  and add your key."
+        echo ""
+    fi
+else
+    echo "WARNING: No .env file found."
+    echo "  Run: cp .env.example .env  and add at least one API key."
     echo ""
 fi
 
@@ -26,7 +46,7 @@ pip install -q -r requirements.txt
 
 echo ""
 echo "========================================="
-echo "  Starting VideoProj on http://localhost:8000"
+echo "  StudyLens running on http://localhost:8000"
 echo "========================================="
 echo ""
 
