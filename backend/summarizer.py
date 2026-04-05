@@ -15,13 +15,14 @@ def resolve_provider_and_key(api_key: str = None, provider: str = None):
         return provider, api_key
 
     # Auto-detect provider from key format
+    # NOTE: sk-ant- must be checked BEFORE sk- (Anthropic keys start with sk-ant-)
     if api_key:
-        if api_key.startswith("sk-"):
+        if api_key.startswith("sk-ant-"):
+            return "anthropic", api_key
+        elif api_key.startswith("sk-"):
             return "openai", api_key
         elif api_key.startswith("AIza"):
             return "gemini", api_key
-        elif api_key.startswith("sk-ant-"):
-            return "anthropic", api_key
         return "openai", api_key  # default guess
 
     # Fall back to .env keys — try each
@@ -83,17 +84,6 @@ async def _call_anthropic(api_key: str, system: str, prompt: str) -> str:
     )
     return resp.content[0].text
 
-
-# For chat endpoints that create their own client
-def _get_client(api_key: str = None):
-    """Returns OpenAI client. Used by chat endpoints."""
-    key = api_key or os.environ.get("OPENAI_API_KEY", "")
-    return AsyncOpenAI(api_key=key)
-
-
-def get_chat_provider_and_key(api_key: str = None, provider: str = None):
-    """For chat endpoints — returns (provider, key)."""
-    return resolve_provider_and_key(api_key, provider)
 
 
 async def chat_completion(messages: list, api_key: str = None, provider: str = None) -> str:

@@ -263,7 +263,7 @@ STUDY MATERIAL:
     if chat.get("selected_text"):
         system_prompt += f"\n\nOriginal selected text:\n\"{chat['selected_text'][:1000]}\""
 
-    # Build full message history for OpenAI
+    # Build full message history
     prev = chat["messages"]
     prev.append({"role": "user", "content": user_message})
     api_messages = [{"role": "system", "content": system_prompt}] + prev[-10:]  # last 10 msgs
