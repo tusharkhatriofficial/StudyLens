@@ -106,25 +106,107 @@ Everything runs on your machine except the LLM API calls for generating AI conte
 
 ## Getting Started
 
-### One-Command Docker Setup (Recommended)
+### Run with Docker — One Command, No Setup
 
-You only need [Docker Desktop](https://www.docker.com/products/docker-desktop/) installed — nothing else.
+Install [Docker Desktop](https://www.docker.com/products/docker-desktop/) (free), then pick your AI provider and run **one command**:
+
+<table>
+<tr>
+<td><strong>Provider</strong></td>
+<td><strong>Command</strong></td>
+</tr>
+<tr>
+<td>
+
+**OpenAI**<br><sub>gpt-4o-mini</sub><br><sub>[Get key](https://platform.openai.com/api-keys)</sub>
+
+</td>
+<td>
 
 ```bash
-docker run -d -p 8000:8000 -e OPENAI_API_KEY=sk-your-key-here -v studylens-data:/app/data --restart unless-stopped tusharkhatriofficial/studylens
+docker run -d -p 8000:8000 \
+  -e OPENAI_API_KEY=sk-your-key-here \
+  -v studylens-data:/app/data \
+  --restart unless-stopped \
+  --name studylens \
+  tusharkhatriofficial/studylens
 ```
 
-Open **http://localhost:8000**. Done.
+</td>
+</tr>
+<tr>
+<td>
 
-> Replace `OPENAI_API_KEY=sk-your-key-here` with your actual key. You can use `GEMINI_API_KEY` or `ANTHROPIC_API_KEY` instead — see [API Key Setup](#-api-key-setup).
+**Google Gemini**<br><sub>gemini-2.5-flash</sub><br><sub>[Get key](https://aistudio.google.com/apikey)</sub>
 
-**Your data is safe.** The `-v studylens-data:/app/data` flag stores the SQLite database (accounts, history, chats) in a Docker volume. It persists across container stops, restarts, and updates. You will never lose your data.
+</td>
+<td>
 
-To stop: `docker stop <container-id>`. To start again: `docker start <container-id>`. To update: `docker pull tusharkhatriofficial/studylens && docker run ...` (same command as above).
+```bash
+docker run -d -p 8000:8000 \
+  -e GEMINI_API_KEY=your-gemini-key-here \
+  -v studylens-data:/app/data \
+  --restart unless-stopped \
+  --name studylens \
+  tusharkhatriofficial/studylens
+```
 
-### Docker Compose (alternative)
+</td>
+</tr>
+<tr>
+<td>
 
-For a more permanent setup, create a folder with this `docker-compose.yml`:
+**Anthropic**<br><sub>claude-sonnet</sub><br><sub>[Get key](https://console.anthropic.com/settings/keys)</sub>
+
+</td>
+<td>
+
+```bash
+docker run -d -p 8000:8000 \
+  -e ANTHROPIC_API_KEY=sk-ant-your-key-here \
+  -v studylens-data:/app/data \
+  --restart unless-stopped \
+  --name studylens \
+  tusharkhatriofficial/studylens
+```
+
+</td>
+</tr>
+</table>
+
+**Open [http://localhost:8000](http://localhost:8000) and start studying.**
+
+> You only need **one** key. Pick whichever provider you prefer. Google Gemini has a free tier.
+
+### Your data is safe
+
+The `-v studylens-data:/app/data` part stores your SQLite database (accounts, study history, chats) in a persistent Docker volume. Your data survives:
+
+- Stopping the container (`docker stop studylens`)
+- Restarting Docker Desktop
+- Updating to a new version
+- Even deleting and re-creating the container
+
+The **only** way to lose data is explicitly deleting the volume with `docker volume rm studylens-data`.
+
+### Common Docker commands
+
+| What | Command |
+|------|---------|
+| **Stop** | `docker stop studylens` |
+| **Start again** | `docker start studylens` |
+| **View logs** | `docker logs studylens` |
+| **Update to latest** | `docker pull tusharkhatriofficial/studylens && docker rm -f studylens` then run the original command again |
+| **Remove everything** | `docker rm -f studylens && docker volume rm studylens-data` |
+
+---
+
+<details>
+<summary><strong>Docker Compose setup (alternative)</strong></summary>
+
+<br>
+
+Create a `docker-compose.yml` file:
 
 ```yaml
 services:
@@ -133,7 +215,7 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - OPENAI_API_KEY=sk-your-key-here
+      - OPENAI_API_KEY=sk-your-key-here    # or GEMINI_API_KEY or ANTHROPIC_API_KEY
     volumes:
       - studylens-data:/app/data
     restart: unless-stopped
@@ -142,17 +224,14 @@ volumes:
   studylens-data:
 ```
 
-Then run:
+Then: `docker compose up -d`
 
-```bash
-docker compose up -d
-```
+</details>
 
----
+<details>
+<summary><strong>Manual setup without Docker (for developers)</strong></summary>
 
-### Manual Setup (without Docker)
-
-If you prefer running it directly:
+<br>
 
 | Requirement | Install |
 |-------------|---------|
@@ -163,18 +242,16 @@ If you prefer running it directly:
 ```bash
 git clone https://github.com/tusharkhatriofficial/study_lense.git
 cd study_lense
-```
-
-Create the `.env` file (`cp .env.example .env` and add your key), then:
-
-```bash
+cp .env.example .env     # then edit .env and add your key
 chmod +x run.sh
 ./run.sh
 ```
 
 Open **http://localhost:8000**.
 
-> First run creates a virtual environment, installs dependencies, and downloads the Whisper `base` model (~150MB). This is a one-time setup.
+> First run creates a virtual environment, installs dependencies, and downloads the Whisper `base` model (~150MB). One-time setup.
+
+</details>
 
 ---
 
