@@ -1816,6 +1816,10 @@ function setupBatchQueue() {
             alert('Invalid YouTube URL');
             return;
         }
+        if (batchQueue.includes(url)) {
+            alert('This URL is already in the queue');
+            return;
+        }
         batchQueue.push(url);
         urlInput.value = '';
         addBtn.classList.add('hidden');

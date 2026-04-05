@@ -23,9 +23,19 @@ if not _USE_MLX:
 
 # ===================== MLX Backend (Apple Silicon) =====================
 
+_MLX_MODELS = {
+    "tiny": "mlx-community/whisper-tiny",
+    "base": "mlx-community/whisper-base-mlx",
+    "small": "mlx-community/whisper-small-mlx",
+    "medium": "mlx-community/whisper-medium-mlx",
+    "large": "mlx-community/whisper-large-mlx",
+    "large-v2": "mlx-community/whisper-large-v2-mlx",
+    "large-v3": "mlx-community/whisper-large-v3-mlx",
+}
+
 def _transcribe_mlx(audio_path: Path, progress_callback=None) -> dict:
     """Transcribe using mlx-whisper on Apple Silicon GPU."""
-    model_repo = f"mlx-community/whisper-{_model_size}"
+    model_repo = _MLX_MODELS.get(_model_size, f"mlx-community/whisper-{_model_size}-mlx")
 
     result = mlx_whisper.transcribe(
         str(audio_path),
