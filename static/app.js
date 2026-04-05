@@ -606,6 +606,14 @@ function renderHistory(historyItems, standaloneChats) {
     });
 
     // Drag and drop for items
+    async function moveItemToFolder(data, folderId) {
+        const endpoint = data.type === 'study'
+            ? `/api/history/${data.id}/move`
+            : `/api/standalone-chats/${data.id}/move`;
+        await fetch(endpoint, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({folder_id: folderId})});
+        loadHistory();
+    }
+
     list.querySelectorAll('.hi-row[draggable]').forEach(el => {
         el.addEventListener('dragstart', e => {
             e.dataTransfer.setData('text/plain', JSON.stringify({
@@ -634,36 +642,20 @@ function renderHistory(historyItems, standaloneChats) {
             const fid = hdr.dataset.folderId;
             try {
                 const data = JSON.parse(e.dataTransfer.getData('text/plain'));
-                if (data.type === 'study') {
-                    await fetch(`/api/history/${data.id}/move`, {
-                        method:'POST', headers:{'Content-Type':'application/json'},
-                        body: JSON.stringify({folder_id: +fid})
-                    });
-                    loadHistory();
-                }
+                await moveItemToFolder(data, +fid);
             } catch {}
         });
     });
 
     // Also allow dropping into the folder-items area (the open body of a folder)
     list.querySelectorAll('.folder-items').forEach(fi => {
-        fi.addEventListener('dragover', e => {
-            e.preventDefault();
-            e.stopPropagation();
-        });
+        fi.addEventListener('dragover', e => { e.preventDefault(); e.stopPropagation(); });
         fi.addEventListener('drop', async e => {
             e.preventDefault();
             e.stopPropagation();
-            const fid = fi.dataset.folderId;
             try {
                 const data = JSON.parse(e.dataTransfer.getData('text/plain'));
-                if (data.type === 'study') {
-                    await fetch(`/api/history/${data.id}/move`, {
-                        method:'POST', headers:{'Content-Type':'application/json'},
-                        body: JSON.stringify({folder_id: +fid})
-                    });
-                    loadHistory();
-                }
+                await moveItemToFolder(data, +fi.dataset.folderId);
             } catch {}
         });
     });
@@ -674,13 +666,7 @@ function renderHistory(historyItems, standaloneChats) {
         e.preventDefault();
         try {
             const data = JSON.parse(e.dataTransfer.getData('text/plain'));
-            if (data.type === 'study') {
-                await fetch(`/api/history/${data.id}/move`, {
-                    method:'POST', headers:{'Content-Type':'application/json'},
-                    body: JSON.stringify({folder_id: null})
-                });
-                loadHistory();
-            }
+            await moveItemToFolder(data, null);
         } catch {}
     });
 
@@ -803,7 +789,7 @@ function showFolderMenu(btn, folderId, folderName) {
 
 function toggleMenu(btn, id, title, type) {
     // Build folder move submenu items
-    const folderItems = _allFolders.length && type === 'study'
+    const folderItems = _allFolders.length
         ? `<div class="border-t border-gray-200/60 dark:border-white/[0.06] my-1"></div>
            <div class="px-3 py-1.5 text-[10px] uppercase tracking-wider text-gray-400 font-semibold">Move to</div>
            <button class="menu-unfolder flex items-center gap-3 w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-left">
@@ -844,15 +830,16 @@ function toggleMenu(btn, id, title, type) {
                 loadHistory();
             }
         });
+        const moveEndpoint = type === 'study' ? `/api/history/${id}/move` : `/api/standalone-chats/${id}/move`;
         menu.querySelector('.menu-unfolder')?.addEventListener('click', async e => {
             e.stopPropagation(); closeAllMenus();
-            await fetch(`/api/history/${id}/move`, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({folder_id:null})});
+            await fetch(moveEndpoint, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({folder_id:null})});
             loadHistory();
         });
         menu.querySelectorAll('.menu-move-folder').forEach(fb => {
             fb.addEventListener('click', async e => {
                 e.stopPropagation(); closeAllMenus();
-                await fetch(`/api/history/${id}/move`, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({folder_id:+fb.dataset.fid})});
+                await fetch(moveEndpoint, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({folder_id:+fb.dataset.fid})});
                 loadHistory();
             });
         });

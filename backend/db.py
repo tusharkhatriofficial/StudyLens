@@ -92,6 +92,7 @@ def init_db():
     for stmt in [
         "ALTER TABLE history ADD COLUMN folder_id INTEGER REFERENCES folders(id) ON DELETE SET NULL",
         "ALTER TABLE folders ADD COLUMN parent_id INTEGER REFERENCES folders(id) ON DELETE CASCADE",
+        "ALTER TABLE standalone_chats ADD COLUMN folder_id INTEGER REFERENCES folders(id) ON DELETE SET NULL",
     ]:
         try:
             conn.execute(stmt)
@@ -245,8 +246,10 @@ def delete_folder(user_id: int, folder_id: int, delete_items: bool = False):
     conn = get_conn()
     if delete_items:
         conn.execute("DELETE FROM history WHERE folder_id=? AND user_id=?", (folder_id, user_id))
+        conn.execute("DELETE FROM standalone_chats WHERE folder_id=? AND user_id=?", (folder_id, user_id))
     else:
         conn.execute("UPDATE history SET folder_id=NULL WHERE folder_id=? AND user_id=?", (folder_id, user_id))
+        conn.execute("UPDATE standalone_chats SET folder_id=NULL WHERE folder_id=? AND user_id=?", (folder_id, user_id))
     # Move sub-folders to parent (or root)
     parent = conn.execute("SELECT parent_id FROM folders WHERE id=? AND user_id=?", (folder_id, user_id)).fetchone()
     parent_id = parent["parent_id"] if parent else None
@@ -382,10 +385,17 @@ def update_standalone_chat(chat_id: int, user_id: int, messages: list):
     conn.close()
 
 
+def move_chat_to_folder(user_id: int, chat_id: int, folder_id: int = None):
+    conn = get_conn()
+    conn.execute("UPDATE standalone_chats SET folder_id=? WHERE id=? AND user_id=?", (folder_id, chat_id, user_id))
+    conn.commit()
+    conn.close()
+
+
 def get_standalone_chats(user_id: int, limit: int = 50):
     conn = get_conn()
     rows = conn.execute(
-        "SELECT id, history_id, title, messages, created_at FROM standalone_chats WHERE user_id=? ORDER BY created_at DESC LIMIT ?",
+        "SELECT id, history_id, title, messages, folder_id, created_at FROM standalone_chats WHERE user_id=? ORDER BY created_at DESC LIMIT ?",
         (user_id, limit),
     ).fetchall()
     conn.close()

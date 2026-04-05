@@ -174,8 +174,17 @@ async def delete_folder(folder_id: int, request: Request):
 async def move_to_folder(item_id: int, request: Request):
     user = require_user(request)
     body = await request.json()
-    folder_id = body.get("folder_id")  # null = remove from folder
+    folder_id = body.get("folder_id")
     db.move_to_folder(user["id"], item_id, folder_id)
+    return {"ok": True}
+
+
+@app.post("/api/standalone-chats/{chat_id}/move")
+async def move_chat_to_folder(chat_id: int, request: Request):
+    user = require_user(request)
+    body = await request.json()
+    folder_id = body.get("folder_id")
+    db.move_chat_to_folder(user["id"], chat_id, folder_id)
     return {"ok": True}
 
 
