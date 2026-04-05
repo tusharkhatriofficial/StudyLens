@@ -106,36 +106,47 @@ Everything runs on your machine except the LLM API calls for generating AI conte
 
 ## Getting Started
 
-### Quick Start with Docker (Recommended)
+### One-Command Docker Setup (Recommended)
 
-The easiest way to run StudyLens. You only need [Docker](https://www.docker.com/products/docker-desktop/) installed — nothing else.
-
-**Step 1:** Clone the repo
+You only need [Docker Desktop](https://www.docker.com/products/docker-desktop/) installed — nothing else.
 
 ```bash
-git clone https://github.com/tusharkhatriofficial/study_lense.git
-cd study_lense
+docker run -d -p 8000:8000 -e OPENAI_API_KEY=sk-your-key-here -v studylens-data:/app/data --restart unless-stopped tusharkhatriofficial/studylens
 ```
 
-**Step 2:** Create a `.env` file with your API key
+Open **http://localhost:8000**. Done.
+
+> Replace `OPENAI_API_KEY=sk-your-key-here` with your actual key. You can use `GEMINI_API_KEY` or `ANTHROPIC_API_KEY` instead — see [API Key Setup](#-api-key-setup).
+
+**Your data is safe.** The `-v studylens-data:/app/data` flag stores the SQLite database (accounts, history, chats) in a Docker volume. It persists across container stops, restarts, and updates. You will never lose your data.
+
+To stop: `docker stop <container-id>`. To start again: `docker start <container-id>`. To update: `docker pull tusharkhatriofficial/studylens && docker run ...` (same command as above).
+
+### Docker Compose (alternative)
+
+For a more permanent setup, create a folder with this `docker-compose.yml`:
+
+```yaml
+services:
+  studylens:
+    image: tusharkhatriofficial/studylens:latest
+    ports:
+      - "8000:8000"
+    environment:
+      - OPENAI_API_KEY=sk-your-key-here
+    volumes:
+      - studylens-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  studylens-data:
+```
+
+Then run:
 
 ```bash
-cp .env.example .env
+docker compose up -d
 ```
-
-Open `.env` and uncomment + fill in at least one key. See [API Key Setup](#-api-key-setup) for details.
-
-**Step 3:** Start it
-
-```bash
-docker compose up
-```
-
-That's it. Open **http://localhost:8000** in your browser.
-
-> Your data (accounts, history, chats) is saved in the `data/` folder on your machine. It persists across restarts — you won't lose anything.
-
-To stop: press `Ctrl+C`. To start again: `docker compose up`. To run in the background: `docker compose up -d`.
 
 ---
 

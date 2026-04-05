@@ -1,10 +1,16 @@
 services:
   studylens:
-    build: .
+    image: tusharkhatriofficial/studylens:latest
     ports:
       - "8000:8000"
-    env_file:
-      - .env
+    environment:
+      # Add your API key here (at least one required for AI features)
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
     volumes:
-      - ./data:/app/data
+      - studylens-data:/app/data
     restart: unless-stopped
+
+volumes:
+  studylens-data:
