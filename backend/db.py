@@ -79,7 +79,19 @@ def init_db():
         );
         CREATE INDEX IF NOT EXISTS idx_usage_user ON usage(user_id, created_at);
         CREATE INDEX IF NOT EXISTS idx_usage_ip ON usage(ip, created_at);
+
+        CREATE TABLE IF NOT EXISTS folders (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+            name TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
     """)
+    # Add folder_id column to history if it doesn't exist
+    try:
+        conn.execute("ALTER TABLE history ADD COLUMN folder_id INTEGER REFERENCES folders(id) ON DELETE SET NULL")
+    except Exception:
+        pass  # Column already exists
     conn.commit()
     conn.close()
 
@@ -199,10 +211,51 @@ def save_history(user_id: int, title: str, source_type: str, source_url: str,
     return history_id
 
 
+# ---- Folders ----
+
+def create_folder(user_id: int, name: str) -> int:
+    conn = get_conn()
+    cur = conn.execute("INSERT INTO folders (user_id, name) VALUES (?, ?)", (user_id, name))
+    conn.commit()
+    fid = cur.lastrowid
+    conn.close()
+    return fid
+
+
+def get_folders(user_id: int):
+    conn = get_conn()
+    rows = conn.execute("SELECT id, name, created_at FROM folders WHERE user_id=? ORDER BY name", (user_id,)).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def rename_folder(user_id: int, folder_id: int, name: str):
+    conn = get_conn()
+    conn.execute("UPDATE folders SET name=? WHERE id=? AND user_id=?", (name, folder_id, user_id))
+    conn.commit()
+    conn.close()
+
+
+def delete_folder(user_id: int, folder_id: int):
+    conn = get_conn()
+    # Move items out of folder before deleting
+    conn.execute("UPDATE history SET folder_id=NULL WHERE folder_id=? AND user_id=?", (folder_id, user_id))
+    conn.execute("DELETE FROM folders WHERE id=? AND user_id=?", (folder_id, user_id))
+    conn.commit()
+    conn.close()
+
+
+def move_to_folder(user_id: int, history_id: int, folder_id: int = None):
+    conn = get_conn()
+    conn.execute("UPDATE history SET folder_id=? WHERE id=? AND user_id=?", (folder_id, history_id, user_id))
+    conn.commit()
+    conn.close()
+
+
 def get_history(user_id: int, limit: int = 50):
     conn = get_conn()
     rows = conn.execute(
-        "SELECT id, title, source_type, source_url, duration, language, options, created_at FROM history WHERE user_id=? ORDER BY created_at DESC LIMIT ?",
+        "SELECT id, title, source_type, source_url, duration, language, options, folder_id, created_at FROM history WHERE user_id=? ORDER BY created_at DESC LIMIT ?",
         (user_id, limit),
     ).fetchall()
     conn.close()

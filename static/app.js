@@ -480,58 +480,171 @@ function downloadFrom(bodyId) {
 }
 
 // ==================== History ====================
+let _allFolders = [];
+let _allHistoryItems = [];
+let _allStandaloneChats = [];
+
 async function loadHistory() {
     const skeleton = document.getElementById('history-skeleton');
     if (skeleton) skeleton.classList.remove('hidden');
     const list = document.getElementById('history-list');
     if (list) list.innerHTML = '';
     try {
-        const [histResp, chatResp] = await Promise.all([
+        const [histResp, chatResp, folderResp] = await Promise.all([
             fetch('/api/history'),
             currentUser ? fetch('/api/standalone-chats') : Promise.resolve(null),
+            currentUser ? fetch('/api/folders') : Promise.resolve(null),
         ]);
         const histData = await histResp.json();
         const chatData = chatResp ? await chatResp.json() : {chats:[]};
+        const folderData = folderResp ? await folderResp.json() : {folders:[]};
         if (skeleton) skeleton.remove();
-        renderHistory(histData.history||[], chatData.chats||[]);
+        _allFolders = folderData.folders || [];
+        _allHistoryItems = histData.history || [];
+        _allStandaloneChats = chatData.chats || [];
+        renderHistory(_allHistoryItems, _allStandaloneChats);
     } catch {
         if (skeleton) skeleton.remove();
     }
 }
 
+function renderHistoryRow(item, isStudy) {
+    const date = new Date(item.created_at).toLocaleDateString('en',{month:'short',day:'numeric'});
+    const title = item.title || (isStudy && item.source_url?.includes('v=') ? item.source_url.split('v=').pop().slice(0,14) : 'Chat');
+    const studyIcon = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="shrink-0 text-brand-500"><path d="M8 5v14l11-7z"/></svg>';
+    const chatIcon = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="shrink-0 text-emerald-500"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>';
+    const icon = isStudy ? studyIcon : chatIcon;
+    const dataAttr = isStudy ? `data-study-id="${item.id}"` : `data-chat-id="${item.id}"`;
+    return `<div class="hi-row relative group flex items-center gap-2.5 px-3 py-3 rounded-lg cursor-pointer text-base text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-200 transition-colors mb-0.5" ${dataAttr} draggable="true" data-title="${esc(title)}" data-type="${isStudy?'study':'chat'}">
+        ${icon}
+        <span class="truncate flex-1">${esc(title)}</span>
+        <span class="text-xs text-gray-400 dark:text-gray-600 ml-1 shrink-0">${date}</span>
+        <button class="hi-menu ml-1 shrink-0 p-1 rounded-md opacity-0 group-hover:opacity-100 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-all">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
+        </button>
+    </div>`;
+}
+
 function renderHistory(historyItems, standaloneChats) {
     const list = document.getElementById('history-list');
-    if (!historyItems.length && !standaloneChats.length) {
+    if (!historyItems.length && !standaloneChats.length && !_allFolders.length) {
         list.innerHTML = currentUser
             ? '<p class="text-base text-gray-400 dark:text-gray-600 text-center py-10">No history yet</p>'
             : '<p class="text-base text-gray-400 dark:text-gray-600 text-center py-10">Login to save history</p>';
         return;
     }
 
-    // Merge both into one timeline sorted by date
+    // Build all items
     const all = [];
     historyItems.forEach(h => all.push({...h, _type:'study'}));
     standaloneChats.forEach(c => all.push({...c, _type:'chat'}));
     all.sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
 
-    const studyIcon = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="shrink-0 text-brand-500"><path d="M8 5v14l11-7z"/></svg>';
-    const chatIcon = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="shrink-0 text-emerald-500"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>';
+    // Split into folder groups
+    const unfiled = all.filter(i => !i.folder_id);
+    const folderMap = {};
+    _allFolders.forEach(f => { folderMap[f.id] = {folder: f, items: []}; });
+    all.forEach(i => { if (i.folder_id && folderMap[i.folder_id]) folderMap[i.folder_id].items.push(i); });
 
-    list.innerHTML = all.map(item => {
-        const date = new Date(item.created_at).toLocaleDateString('en',{month:'short',day:'numeric'});
-        const isStudy = item._type === 'study';
-        const title = item.title || (isStudy && item.source_url?.includes('v=') ? item.source_url.split('v=').pop().slice(0,14) : 'Chat');
-        const icon = isStudy ? studyIcon : chatIcon;
-        const dataAttr = isStudy ? `data-study-id="${item.id}"` : `data-chat-id="${item.id}"`;
-        return `<div class="hi-row relative group flex items-center gap-2.5 px-3 py-3 rounded-lg cursor-pointer text-base text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-200 transition-colors mb-0.5" ${dataAttr} data-title="${esc(title)}" data-type="${item._type}">
-            ${icon}
-            <span class="truncate flex-1">${esc(title)}</span>
-            <span class="text-xs text-gray-400 dark:text-gray-600 ml-1 shrink-0">${date}</span>
-            <button class="hi-menu ml-1 shrink-0 p-1 rounded-md opacity-0 group-hover:opacity-100 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-all">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
-            </button>
+    let html = '';
+
+    // Render folders
+    _allFolders.forEach(f => {
+        const items = folderMap[f.id]?.items || [];
+        const isOpen = localStorage.getItem(`studylens-folder-${f.id}`) !== 'closed';
+        html += `<div class="folder-group mb-1" data-folder-id="${f.id}">
+            <div class="folder-header group flex items-center gap-2 px-3 py-2.5 rounded-lg cursor-pointer text-sm font-semibold text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                 data-folder-id="${f.id}">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="shrink-0 text-amber-500 transition-transform ${isOpen?'':'rotate-[-90deg]'}"><polyline points="6 9 12 15 18 9"/></svg>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="shrink-0 text-amber-500"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+                <span class="truncate flex-1">${esc(f.name)}</span>
+                <span class="text-xs text-gray-400 dark:text-gray-600 font-normal">${items.length}</span>
+                <button class="folder-menu ml-1 shrink-0 p-1 rounded-md opacity-0 group-hover:opacity-100 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-all">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
+                </button>
+            </div>
+            <div class="folder-items pl-4 ${isOpen?'':'hidden'}" data-folder-id="${f.id}">
+                ${items.map(i => renderHistoryRow(i, i._type==='study')).join('')}
+                ${!items.length ? '<p class="text-xs text-gray-400 dark:text-gray-600 px-3 py-2">Drag items here</p>' : ''}
+            </div>
         </div>`;
-    }).join('');
+    });
+
+    // Render unfiled items
+    html += unfiled.map(i => renderHistoryRow(i, i._type==='study')).join('');
+
+    list.innerHTML = html;
+
+    // Folder toggle
+    list.querySelectorAll('.folder-header').forEach(hdr => {
+        hdr.addEventListener('click', e => {
+            if (e.target.closest('.folder-menu')) return;
+            const fid = hdr.dataset.folderId;
+            const items = list.querySelector(`.folder-items[data-folder-id="${fid}"]`);
+            const arrow = hdr.querySelector('svg');
+            items.classList.toggle('hidden');
+            arrow.classList.toggle('rotate-[-90deg]');
+            localStorage.setItem(`studylens-folder-${fid}`, items.classList.contains('hidden') ? 'closed' : 'open');
+        });
+    });
+
+    // Folder context menu (rename/delete)
+    list.querySelectorAll('.folder-menu').forEach(btn => {
+        btn.addEventListener('click', e => {
+            e.stopPropagation();
+            const fid = btn.closest('.folder-header').dataset.folderId;
+            const folder = _allFolders.find(f => f.id == fid);
+            showFolderMenu(btn, fid, folder?.name || 'Folder');
+        });
+    });
+
+    // Drag and drop for items
+    list.querySelectorAll('.hi-row[draggable]').forEach(el => {
+        el.addEventListener('dragstart', e => {
+            e.dataTransfer.setData('text/plain', JSON.stringify({
+                type: el.dataset.type, id: el.dataset.studyId || el.dataset.chatId
+            }));
+            el.classList.add('opacity-50');
+        });
+        el.addEventListener('dragend', () => el.classList.remove('opacity-50'));
+    });
+
+    // Drop targets: folders
+    list.querySelectorAll('.folder-group').forEach(fg => {
+        fg.addEventListener('dragover', e => { e.preventDefault(); fg.querySelector('.folder-header').classList.add('!bg-brand-50', 'dark:!bg-brand-500/10'); });
+        fg.addEventListener('dragleave', () => fg.querySelector('.folder-header').classList.remove('!bg-brand-50', 'dark:!bg-brand-500/10'));
+        fg.addEventListener('drop', async e => {
+            e.preventDefault();
+            fg.querySelector('.folder-header').classList.remove('!bg-brand-50', 'dark:!bg-brand-500/10');
+            try {
+                const data = JSON.parse(e.dataTransfer.getData('text/plain'));
+                if (data.type === 'study') {
+                    await fetch(`/api/history/${data.id}/move`, {
+                        method:'POST', headers:{'Content-Type':'application/json'},
+                        body: JSON.stringify({folder_id: +fg.dataset.folderId})
+                    });
+                    loadHistory();
+                }
+            } catch {}
+        });
+    });
+
+    // Drop on sidebar root = remove from folder
+    list.addEventListener('dragover', e => e.preventDefault());
+    list.addEventListener('drop', async e => {
+        if (e.target.closest('.folder-group')) return; // handled above
+        e.preventDefault();
+        try {
+            const data = JSON.parse(e.dataTransfer.getData('text/plain'));
+            if (data.type === 'study') {
+                await fetch(`/api/history/${data.id}/move`, {
+                    method:'POST', headers:{'Content-Type':'application/json'},
+                    body: JSON.stringify({folder_id: null})
+                });
+                loadHistory();
+            }
+        } catch {}
+    });
 
     // Click row to open
     list.querySelectorAll('.hi-row').forEach(el => {
@@ -541,7 +654,6 @@ function renderHistory(historyItems, standaloneChats) {
             if (el.dataset.type === 'study') {
                 openHistory(+el.dataset.studyId);
             } else {
-                // Open standalone chat
                 const chat = standaloneChats.find(c => c.id == el.dataset.chatId);
                 if (chat) openExistingFullChat(chat);
             }
@@ -566,6 +678,58 @@ function closeAllMenus() {
     document.querySelectorAll('.hi-dropdown').forEach(m => m.remove());
 }
 
+// ---- New Folder ----
+document.getElementById('new-folder-btn')?.addEventListener('click', async () => {
+    if (!currentUser) { alert('Login to create folders'); return; }
+    const name = prompt('Folder name:');
+    if (name && name.trim()) {
+        await fetch('/api/folders', {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({name: name.trim()})
+        });
+        loadHistory();
+    }
+});
+
+function showFolderMenu(btn, folderId, folderName) {
+    closeAllMenus();
+    const menu = document.createElement('div');
+    menu.className = 'hi-dropdown absolute right-2 top-full mt-1 z-50 glass-card rounded-xl shadow-lg py-1.5 min-w-[140px]';
+    menu.innerHTML = `
+        <button class="fm-rename flex items-center gap-3 w-full px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-left">Rename</button>
+        <button class="fm-delete flex items-center gap-3 w-full px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors text-left">Delete</button>
+    `;
+    btn.closest('.folder-header').appendChild(menu);
+
+    menu.querySelector('.fm-rename').addEventListener('click', async e => {
+        e.stopPropagation();
+        closeAllMenus();
+        const newName = prompt('Rename folder:', folderName);
+        if (newName && newName.trim() && newName.trim() !== folderName) {
+            await fetch(`/api/folders/${folderId}`, {
+                method:'PATCH', headers:{'Content-Type':'application/json'},
+                body: JSON.stringify({name: newName.trim()})
+            });
+            loadHistory();
+        }
+    });
+
+    menu.querySelector('.fm-delete').addEventListener('click', async e => {
+        e.stopPropagation();
+        closeAllMenus();
+        if (confirm(`Delete folder "${folderName}"? Items inside will be moved out, not deleted.`)) {
+            await fetch(`/api/folders/${folderId}`, {method:'DELETE'});
+            loadHistory();
+        }
+    });
+
+    setTimeout(() => {
+        document.addEventListener('click', function close(ev) {
+            if (!menu.contains(ev.target)) { menu.remove(); document.removeEventListener('click', close); }
+        });
+    }, 10);
+}
+
 function toggleMenu(btn, id, title, type) {
     // If menu already open for this button, close it
     const existing = btn.parentElement.querySelector('.hi-dropdown');
@@ -575,6 +739,20 @@ function toggleMenu(btn, id, title, type) {
 
     const menu = document.createElement('div');
     menu.className = 'hi-dropdown absolute right-2 top-full mt-1 z-50 glass-card rounded-xl shadow-lg py-1.5 min-w-[160px]';
+    // Build folder move submenu items
+    const folderItems = _allFolders.length && type === 'study'
+        ? `<div class="border-t border-gray-200/60 dark:border-white/[0.06] my-1"></div>
+           <div class="px-3 py-1.5 text-[10px] uppercase tracking-wider text-gray-400 font-semibold">Move to</div>
+           <button class="menu-unfolder flex items-center gap-3 w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-left">
+               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+               No folder
+           </button>
+           ${_allFolders.map(f => `<button class="menu-move-folder flex items-center gap-3 w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-left" data-fid="${f.id}">
+               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-amber-500"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+               ${esc(f.name)}
+           </button>`).join('')}`
+        : '';
+
     menu.innerHTML = `
         <button class="menu-rename flex items-center gap-3 w-full px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-left">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
@@ -584,6 +762,7 @@ function toggleMenu(btn, id, title, type) {
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
             Delete
         </button>
+        ${folderItems}
     `;
     btn.parentElement.appendChild(menu);
 
@@ -612,6 +791,20 @@ function toggleMenu(btn, id, title, type) {
             await fetch(endpoint, {method:'DELETE'});
             loadHistory();
         }
+    });
+
+    // Move to folder actions
+    menu.querySelector('.menu-unfolder')?.addEventListener('click', async e => {
+        e.stopPropagation(); closeAllMenus();
+        await fetch(`/api/history/${id}/move`, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({folder_id:null})});
+        loadHistory();
+    });
+    menu.querySelectorAll('.menu-move-folder').forEach(fb => {
+        fb.addEventListener('click', async e => {
+            e.stopPropagation(); closeAllMenus();
+            await fetch(`/api/history/${id}/move`, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({folder_id:+fb.dataset.fid})});
+            loadHistory();
+        });
     });
 
     // Close menu when clicking anywhere else

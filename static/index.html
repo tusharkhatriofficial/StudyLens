@@ -125,9 +125,14 @@
                     </div>
                     <span class="text-xl font-extrabold gradient-text">StudyLens</span>
                 </div>
-                <button id="new-btn" class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/[0.06] text-gray-500 hover:text-brand-500 transition-colors" title="New">
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                </button>
+                <div class="flex items-center gap-1">
+                    <button id="new-folder-btn" class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/[0.06] text-gray-500 hover:text-brand-500 transition-colors" title="New Folder">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>
+                    </button>
+                    <button id="new-btn" class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/[0.06] text-gray-500 hover:text-brand-500 transition-colors" title="New">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    </button>
+                </div>
             </div>
 
             <!-- History -->
@@ -721,6 +726,6 @@
         <div id="tour-highlight" class="absolute z-[5] border-2 border-brand-400 rounded-2xl shadow-[0_0_0_4000px_rgba(0,0,0,0.55)] pointer-events-none transition-all duration-300" style="display:none"></div>
     </div>
 
-    <script src="/static/app.js?v=8"></script>
+    <script src="/static/app.js?v=9"></script>
 </body>
 </html>

@@ -130,6 +130,53 @@ async def remove_key(provider: str, request: Request):
     return {"ok": True}
 
 
+# ---- Folders ----
+@app.get("/api/folders")
+async def get_folders(request: Request):
+    user = get_user(request)
+    if not user:
+        return {"folders": []}
+    return {"folders": db.get_folders(user["id"])}
+
+
+@app.post("/api/folders")
+async def create_folder(request: Request):
+    user = require_user(request)
+    body = await request.json()
+    name = body.get("name", "").strip()
+    if not name:
+        raise HTTPException(400, "Folder name required")
+    fid = db.create_folder(user["id"], name)
+    return {"id": fid, "name": name}
+
+
+@app.patch("/api/folders/{folder_id}")
+async def rename_folder(folder_id: int, request: Request):
+    user = require_user(request)
+    body = await request.json()
+    name = body.get("name", "").strip()
+    if not name:
+        raise HTTPException(400, "Folder name required")
+    db.rename_folder(user["id"], folder_id, name)
+    return {"ok": True}
+
+
+@app.delete("/api/folders/{folder_id}")
+async def delete_folder(folder_id: int, request: Request):
+    user = require_user(request)
+    db.delete_folder(user["id"], folder_id)
+    return {"ok": True}
+
+
+@app.post("/api/history/{item_id}/move")
+async def move_to_folder(item_id: int, request: Request):
+    user = require_user(request)
+    body = await request.json()
+    folder_id = body.get("folder_id")  # null = remove from folder
+    db.move_to_folder(user["id"], item_id, folder_id)
+    return {"ok": True}
+
+
 # ---- History (logged-in users only) ----
 @app.get("/api/history")
 async def get_history(request: Request):
