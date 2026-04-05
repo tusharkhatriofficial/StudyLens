@@ -497,7 +497,7 @@ async def merge_sessions(request: Request):
     source_titles = [it.get("title") or f"Video {it['id']}" for it in all_items]
     source_urls = [it.get("source_url", "") for it in all_items]
 
-    # Build combined transcript
+    # Build combined transcript and segments
     all_transcripts = [it["transcript"] for it in all_items if it.get("transcript")]
     if not all_transcripts:
         raise HTTPException(400, "No transcripts found in selected sessions")
@@ -505,6 +505,22 @@ async def merge_sessions(request: Request):
     combined_transcript = "\n\n---\n\n".join(
         f"[{t}]\n{txt}" for t, txt in zip(source_titles, all_transcripts)
     )
+
+    # Merge segments from all sources with time offsets
+    combined_segments = []
+    time_offset = 0.0
+    for it in all_items:
+        it_segs = it.get("segments", [])
+        it_title = it.get("title") or f"Video {it['id']}"
+        # Add a header segment marking the start of this source
+        combined_segments.append({"start": time_offset, "end": time_offset, "text": f"--- {it_title} ---"})
+        for seg in it_segs:
+            combined_segments.append({
+                "start": round(seg["start"] + time_offset, 2),
+                "end": round(seg["end"] + time_offset, 2),
+                "text": seg["text"],
+            })
+        time_offset += it.get("duration", 0) or (it_segs[-1]["end"] if it_segs else 0)
 
     if not title:
         title = "Merged: " + " + ".join(source_titles[:3])
@@ -533,7 +549,7 @@ async def merge_sessions(request: Request):
         total_duration = sum(it.get("duration", 0) for it in all_items)
         history_id = db.save_history(
             user["id"], title, "merge", merge_meta,
-            combined_transcript, [], outputs, options, total_duration, "",
+            combined_transcript, combined_segments, outputs, options, total_duration, "",
         )
         return {"history_id": history_id, "mode": "combine"}
 
@@ -550,12 +566,12 @@ async def merge_sessions(request: Request):
     tasks[task_id] = {"status": "processing", "progress": 10, "stage": "generating", "user_id": user["id"]}
 
     asyncio.create_task(_merge_pipeline(
-        task_id, user["id"], combined_transcript, options, mcq_options, api_key, title, merge_meta, total_duration
+        task_id, user["id"], combined_transcript, options, mcq_options, api_key, title, merge_meta, total_duration, combined_segments
     ))
     return {"task_id": task_id, "mode": "regenerate"}
 
 
-async def _merge_pipeline(task_id, user_id, transcript, options, mcq_options, api_key, title, merge_meta, total_duration):
+async def _merge_pipeline(task_id, user_id, transcript, options, mcq_options, api_key, title, merge_meta, total_duration, segments):
     try:
         outputs = {}
         gen_options = [o for o in options if o != "transcript"]
@@ -587,12 +603,12 @@ async def _merge_pipeline(task_id, user_id, transcript, options, mcq_options, ap
 
         history_id = db.save_history(
             user_id, title, "merge", merge_meta,
-            transcript, [], outputs, options, total_duration, "",
+            transcript, segments, outputs, options, total_duration, "",
         )
 
         tasks[task_id].update(
             status="done", stage="complete", progress=100,
-            outputs=outputs, segments=[],
+            outputs=outputs, segments=segments,
             history_id=history_id,
         )
     except Exception as e:

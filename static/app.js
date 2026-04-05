@@ -366,9 +366,15 @@ function renderContent(bodyId, key, outputs) {
     const body = document.getElementById(bodyId);
     currentTab = key;
     if (key==='transcript' && outputs._segments?.length) {
-        body.innerHTML = outputs._segments.map(s =>
-            `<p class="mb-1.5"><span class="text-brand-500 font-mono text-xs font-semibold mr-1.5">[${fmtTime(s.start)}]</span>${esc(s.text)}</p>`
-        ).join('');
+        body.innerHTML = outputs._segments.map(s => {
+            if (s.text.startsWith('--- ') && s.text.endsWith(' ---')) {
+                const label = esc(s.text.slice(4, -4));
+                return `<div class="mt-6 mb-3 first:mt-0 px-4 py-2.5 rounded-xl bg-purple-50 dark:bg-purple-500/10 border border-purple-200/40 dark:border-purple-500/20">
+                    <span class="text-sm font-semibold text-purple-700 dark:text-purple-300">${label}</span>
+                </div>`;
+            }
+            return `<p class="mb-1.5"><span class="text-brand-500 font-mono text-xs font-semibold mr-1.5">[${fmtTime(s.start)}]</span>${esc(s.text)}</p>`;
+        }).join('');
     } else {
         body.innerHTML = renderMd(outputs[key]||'');
     }
