@@ -92,7 +92,7 @@ You watch a 2-hour lecture. You take notes. You miss things. You rewatch parts. 
 
 | Component | Technology | Runs Locally? |
 |-----------|-----------|:---:|
-| **Transcription** | [faster-whisper](https://github.com/SYSTRAN/faster-whisper) (Whisper model) | Yes |
+| **Transcription** | [faster-whisper](https://github.com/SYSTRAN/faster-whisper) / [mlx-whisper](https://github.com/ml-explore/mlx-examples/tree/main/whisper) (auto-detected) | Yes |
 | **Video Download** | [yt-dlp](https://github.com/yt-dlp/yt-dlp) + [ffmpeg](https://ffmpeg.org) | Yes |
 | **AI Generation** | OpenAI `gpt-4o-mini` / Google `gemini-2.5-flash` / Anthropic `claude-sonnet-4-6` | API call |
 | **Backend** | Python, [FastAPI](https://fastapi.tiangolo.com), Uvicorn | Yes |
@@ -101,6 +101,18 @@ You watch a 2-hour lecture. You take notes. You miss things. You rewatch parts. 
 | **Auth** | PBKDF2-HMAC-SHA256, secure httponly cookies | Yes |
 
 Everything runs on your machine except the LLM API calls for generating AI content.
+
+### Transcription Speed
+
+Transcription speed depends on your hardware. StudyLens auto-detects and uses the fastest option available:
+
+| Hardware | Backend Used | 1-hour video |
+|----------|-------------|:---:|
+| **Apple Silicon Mac** (M1/M2/M3/M4) | mlx-whisper (Metal GPU) | ~5-8 min |
+| **NVIDIA GPU** (CUDA) | faster-whisper (GPU) | ~3-5 min |
+| **CPU only** (Intel Mac, Docker) | faster-whisper (CPU) | ~15-20 min |
+
+No configuration needed — the right backend is selected automatically. On Mac, `run.sh` installs `mlx-whisper` for you.
 
 ---
 

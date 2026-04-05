@@ -667,7 +667,8 @@ async def process(request: Request):
 
     task_id = str(uuid.uuid4())[:8]
     user_id = user["id"] if user else None
-    tasks[task_id] = {"status": "queued", "progress": 0, "stage": "starting", "user_id": user_id}
+    client_ip = request.client.host if request.client else "unknown"
+    tasks[task_id] = {"status": "queued", "progress": 0, "stage": "starting", "user_id": user_id, "ip": client_ip}
 
     upload_path = None
     if file and hasattr(file, "read"):
@@ -710,6 +711,32 @@ async def status_stream(task_id: str):
                 break
             await asyncio.sleep(0.3)
     return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+
+@app.delete("/api/task/{task_id}")
+async def cancel_task(task_id: str):
+    """Cancel a running task."""
+    task = tasks.get(task_id)
+    if task:
+        task["status"] = "cancelled"
+        task["error"] = "Cancelled by user"
+    return {"ok": True}
+
+
+@app.get("/api/active-tasks")
+async def get_active_tasks(request: Request):
+    """Get all active tasks for the current user (for resume on page refresh)."""
+    user = get_user(request)
+    user_id = user["id"] if user else None
+    client_ip = request.client.host if request.client else "unknown"
+
+    active = []
+    for tid, task in tasks.items():
+        if task.get("status") in ("queued", "processing"):
+            # Match by user_id or IP for guests
+            if task.get("user_id") == user_id or (not user_id and task.get("ip") == client_ip):
+                active.append({"task_id": tid, **{k: v for k, v in task.items() if k not in ("user_id", "ip")}})
+    return {"tasks": active}
 
 
 @app.get("/api/health")

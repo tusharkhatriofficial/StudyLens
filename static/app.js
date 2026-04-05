@@ -20,6 +20,8 @@ document.addEventListener('DOMContentLoaded', () => {
     setupMerge();
     setupTour();
     setupExpand();
+    setupBatchQueue();
+    resumeActiveTasks();
 });
 
 // ==================== Theme ====================
@@ -263,27 +265,76 @@ const stageLabels = {
     transcribing:'Transcribing...', generating:'Generating with AI...', complete:'Done!'
 };
 
+let activeTaskId = null;
+let activeES = null;
+
 function trackProgress(taskId) {
+    activeTaskId = taskId;
+    localStorage.setItem('studylens-active-task', taskId);
     document.getElementById('progress-section').classList.remove('hidden');
     document.getElementById('results-section').classList.add('hidden');
+
+    // Bind stop button
+    const stopBtn = document.getElementById('stop-btn');
+    const newStop = stopBtn.cloneNode(true);
+    stopBtn.parentNode.replaceChild(newStop, stopBtn);
+    newStop.addEventListener('click', () => cancelTask(taskId));
+
+    if (activeES) { activeES.close(); }
     const es = new EventSource(`/api/status/${taskId}`);
+    activeES = es;
     es.onmessage = (event) => {
         const d = JSON.parse(event.data);
-        if (d.error && !d.status) { es.close(); alert(d.error); resetBtn(); return; }
+        if (d.error && !d.status) { es.close(); alert(d.error); onTaskDone(); return; }
         document.getElementById('progress-fill').style.width = (d.progress||0)+'%';
         document.getElementById('progress-pct').textContent = (d.progress||0)+'%';
         document.getElementById('progress-stage').textContent = stageLabels[d.stage]||d.stage;
-        if (d.status==='done') { es.close(); showResults(d); resetBtn(); loadHistory(); }
-        if (d.status==='error') { es.close(); alert(d.error||'Error'); resetBtn(); }
+        if (d.status==='done') { es.close(); showResults(d); onTaskDone(); loadHistory(); processBatchQueue(); }
+        if (d.status==='error') { es.close(); alert(d.error||'Error'); onTaskDone(); processBatchQueue(); }
+        if (d.status==='cancelled') { es.close(); onTaskDone(); processBatchQueue(); }
     };
     es.onerror = () => es.close();
 }
 
+async function cancelTask(taskId) {
+    await fetch(`/api/task/${taskId}`, {method:'DELETE'});
+    if (activeES) { activeES.close(); activeES = null; }
+    onTaskDone();
+}
+
+function onTaskDone() {
+    activeTaskId = null;
+    activeES = null;
+    localStorage.removeItem('studylens-active-task');
+    resetBtn();
+    document.getElementById('progress-section').classList.add('hidden');
+}
+
+async function resumeActiveTasks() {
+    // Check if there's a task running from before a refresh
+    const savedTask = localStorage.getItem('studylens-active-task');
+    if (savedTask) {
+        try {
+            const resp = await fetch('/api/active-tasks');
+            const data = await resp.json();
+            const active = (data.tasks || []).find(t => t.task_id === savedTask);
+            if (active && active.status !== 'done' && active.status !== 'error') {
+                showView('generator-view');
+                trackProgress(savedTask);
+                return;
+            }
+        } catch {}
+        localStorage.removeItem('studylens-active-task');
+    }
+}
+
 function resetBtn() {
     const btn = document.getElementById('generate-btn');
-    btn.disabled = false;
-    btn.querySelector('.btn-text').classList.remove('hidden');
-    btn.querySelector('.btn-loader').classList.add('hidden');
+    if (btn) {
+        btn.disabled = false;
+        btn.querySelector('.btn-text').classList.remove('hidden');
+        btn.querySelector('.btn-loader').classList.add('hidden');
+    }
 }
 
 // ==================== Results ====================
@@ -1515,6 +1566,77 @@ function nextTourStep() {
 function endTour() {
     document.getElementById('tour-overlay').classList.add('hidden');
     localStorage.setItem('studylens-toured', '1');
+}
+
+// ==================== Batch Queue ====================
+let batchQueue = []; // [{url, options}]
+
+function setupBatchQueue() {
+    const urlInput = document.getElementById('url-input');
+    const addBtn = document.getElementById('add-to-queue-btn');
+
+    // Show "add another" button when URL is entered
+    urlInput.addEventListener('input', () => {
+        addBtn.classList.toggle('hidden', !urlInput.value.trim());
+    });
+
+    addBtn.addEventListener('click', () => {
+        const url = urlInput.value.trim();
+        if (!url) return;
+        if (!url.includes('youtube.com/') && !url.includes('youtu.be/')) {
+            alert('Invalid YouTube URL');
+            return;
+        }
+        batchQueue.push(url);
+        urlInput.value = '';
+        addBtn.classList.add('hidden');
+        renderBatchQueue();
+    });
+}
+
+function renderBatchQueue() {
+    const container = document.getElementById('url-queue');
+    if (!batchQueue.length) { container.classList.add('hidden'); return; }
+    container.classList.remove('hidden');
+    container.innerHTML = batchQueue.map((url, i) =>
+        `<div class="flex items-center gap-2 px-3 py-2 rounded-lg glass-input text-sm">
+            <span class="text-brand-500 font-mono text-xs shrink-0">#${i+2}</span>
+            <span class="truncate text-gray-600 dark:text-gray-400">${esc(url)}</span>
+            <button onclick="removeBatchItem(${i})" class="ml-auto text-gray-400 hover:text-red-500 shrink-0">&times;</button>
+        </div>`
+    ).join('');
+}
+
+function removeBatchItem(i) {
+    batchQueue.splice(i, 1);
+    renderBatchQueue();
+}
+
+function processBatchQueue() {
+    if (!batchQueue.length) {
+        document.getElementById('batch-section').classList.add('hidden');
+        return;
+    }
+
+    const nextUrl = batchQueue.shift();
+    renderBatchUI();
+
+    // Auto-submit the next URL
+    document.getElementById('url-input').value = nextUrl;
+    startGeneration();
+}
+
+function renderBatchUI() {
+    const section = document.getElementById('batch-section');
+    if (!batchQueue.length) { section.classList.add('hidden'); return; }
+    section.classList.remove('hidden');
+    document.getElementById('batch-count').textContent = `${batchQueue.length} remaining`;
+    document.getElementById('batch-list').innerHTML = batchQueue.map(url =>
+        `<div class="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-50/50 dark:bg-white/[0.02] border border-gray-200/40 dark:border-white/[0.06] text-sm">
+            <span class="inline-block w-1.5 h-1.5 rounded-full bg-gray-300 dark:bg-gray-600 shrink-0"></span>
+            <span class="truncate text-gray-500 dark:text-gray-400">${esc(url)}</span>
+        </div>`
+    ).join('');
 }
 
 // All setup calls are in the single DOMContentLoaded listener at the top of this file.
