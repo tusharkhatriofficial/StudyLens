@@ -982,9 +982,11 @@ function showGenerateMore(data, existingOutputs) {
         </label>`
     ).join('');
 
-    // Bind the Go button
+    // Bind the Go button (reset text and state)
     const goBtn = document.getElementById('generate-more-go');
     const newGoBtn = goBtn.cloneNode(true);
+    newGoBtn.disabled = false;
+    newGoBtn.querySelector('.gm-text').textContent = 'Go';
     goBtn.parentNode.replaceChild(newGoBtn, goBtn);
     newGoBtn.addEventListener('click', () => doGenerateMore(data.id));
 }
