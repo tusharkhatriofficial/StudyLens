@@ -464,7 +464,7 @@ async def _generate_more_pipeline(task_id, user_id, history_id, transcript,
 
         tasks[task_id].update(
             status="done", stage="complete", progress=100,
-            outputs=outputs, history_id=history_id,
+            history_id=history_id,
         )
     except Exception as e:
         tasks[task_id].update(status="error", error=str(e))
