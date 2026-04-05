@@ -852,12 +852,23 @@ async def _process_pipeline(task_id: str, user_id, options: list,
             for opt in gen_options:
                 outputs[opt] = "**No API key found.** Add one in Settings first."
 
+        # Get video title
+        video_title = ""
+        if youtube_url:
+            try:
+                proc = await asyncio.create_subprocess_exec(
+                    "yt-dlp", "--get-title", "--no-warnings", youtube_url,
+                    stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+                )
+                stdout, _ = await proc.communicate()
+                video_title = stdout.decode().strip()[:100]
+            except Exception:
+                pass
+
         # Save history only for logged-in users
         history_id = None
         if user_id:
-            title = youtube_url or (upload_path.name if upload_path else "Video")
-            if youtube_url:
-                title = youtube_url.split("v=")[-1][:20] if "v=" in youtube_url else youtube_url[:50]
+            title = video_title or (upload_path.name.rsplit('.', 1)[0] if upload_path else "Video")
             history_id = db.save_history(
                 user_id, title, "youtube" if youtube_url else "upload",
                 youtube_url or "", transcript_text, segments, outputs, options,

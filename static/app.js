@@ -211,8 +211,16 @@ function hasApiKey() {
 async function startGeneration() {
     const options = [...document.querySelectorAll('input[name="option"]:checked')].map(c => c.value);
     if (!options.length) { alert('Select at least one output option.'); return; }
-    const url = document.getElementById('url-input').value.trim();
+    let url = document.getElementById('url-input').value.trim();
     const file = document.getElementById('file-input').files[0];
+
+    // If main input is empty but queue has URLs, pop the first one
+    if (!url && !file && batchQueue.length) {
+        url = batchQueue.shift();
+        document.getElementById('url-input').value = url;
+        renderBatchQueue();
+    }
+
     if (!url && !file) { alert('Provide a YouTube URL or upload a video.'); return; }
 
     // Validate YouTube URL on frontend
