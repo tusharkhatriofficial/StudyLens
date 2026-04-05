@@ -106,24 +106,18 @@ Everything runs on your machine except the LLM API calls for generating AI conte
 
 ## Getting Started
 
-### Prerequisites
+### Quick Start with Docker (Recommended)
 
-| Requirement | Install |
-|-------------|---------|
-| **Python 3.10+** | [python.org](https://python.org) |
-| **ffmpeg** | `brew install ffmpeg` (macOS) / `apt install ffmpeg` (Linux / WSL) |
-| **An LLM API key** | See [API Key Setup](#-api-key-setup) below |
+The easiest way to run StudyLens. You only need [Docker](https://www.docker.com/products/docker-desktop/) installed — nothing else.
 
-### 1. Clone
+**Step 1:** Clone the repo
 
 ```bash
 git clone https://github.com/tusharkhatriofficial/study_lense.git
 cd study_lense
 ```
 
-### 2. Add your API key
-
-Create a `.env` file in the project root:
+**Step 2:** Create a `.env` file with your API key
 
 ```env
 # You need at least ONE key for AI features (summaries, quizzes, Q&A, etc.)
@@ -134,25 +128,45 @@ OPENAI_API_KEY=sk-your-key-here
 # ANTHROPIC_API_KEY=your-anthropic-key-here
 ```
 
-### 3. Run
+**Step 3:** Start it
+
+```bash
+docker compose up
+```
+
+That's it. Open **http://localhost:8000** in your browser.
+
+> Your data (accounts, history, chats) is saved in the `data/` folder on your machine. It persists across restarts — you won't lose anything.
+
+To stop: press `Ctrl+C`. To start again: `docker compose up`. To run in the background: `docker compose up -d`.
+
+---
+
+### Manual Setup (without Docker)
+
+If you prefer running it directly:
+
+| Requirement | Install |
+|-------------|---------|
+| **Python 3.10+** | [python.org](https://python.org) |
+| **ffmpeg** | `brew install ffmpeg` (macOS) / `apt install ffmpeg` (Linux / WSL) |
+| **An LLM API key** | See [API Key Setup](#-api-key-setup) below |
+
+```bash
+git clone https://github.com/tusharkhatriofficial/study_lense.git
+cd study_lense
+```
+
+Create the `.env` file (same as above), then:
 
 ```bash
 chmod +x run.sh
 ./run.sh
 ```
 
-Open **http://localhost:8000** and you're ready to go.
+Open **http://localhost:8000**.
 
-> First run downloads the Whisper `base` model (~150MB) and installs Python dependencies. This is a one-time setup.
-
-### Docker
-
-```bash
-docker build -t studylens .
-docker run -p 8000:8000 --env-file .env -v ./data:/app/data studylens
-```
-
-Mount `data/` to persist the SQLite database (accounts, history, chats) across restarts.
+> First run creates a virtual environment, installs dependencies, and downloads the Whisper `base` model (~150MB). This is a one-time setup.
 
 ---
 
