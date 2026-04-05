@@ -144,9 +144,10 @@ async def create_folder(request: Request):
     user = require_user(request)
     body = await request.json()
     name = body.get("name", "").strip()
+    parent_id = body.get("parent_id")
     if not name:
         raise HTTPException(400, "Folder name required")
-    fid = db.create_folder(user["id"], name)
+    fid = db.create_folder(user["id"], name, parent_id)
     return {"id": fid, "name": name}
 
 
@@ -164,7 +165,8 @@ async def rename_folder(folder_id: int, request: Request):
 @app.delete("/api/folders/{folder_id}")
 async def delete_folder(folder_id: int, request: Request):
     user = require_user(request)
-    db.delete_folder(user["id"], folder_id)
+    delete_items = request.query_params.get("delete_items") == "1"
+    db.delete_folder(user["id"], folder_id, delete_items)
     return {"ok": True}
 
 

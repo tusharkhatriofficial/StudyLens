@@ -83,15 +83,20 @@ def init_db():
         CREATE TABLE IF NOT EXISTS folders (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+            parent_id INTEGER REFERENCES folders(id) ON DELETE CASCADE,
             name TEXT NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
     """)
-    # Add folder_id column to history if it doesn't exist
-    try:
-        conn.execute("ALTER TABLE history ADD COLUMN folder_id INTEGER REFERENCES folders(id) ON DELETE SET NULL")
-    except Exception:
-        pass  # Column already exists
+    # Add columns if they don't exist (migrations)
+    for stmt in [
+        "ALTER TABLE history ADD COLUMN folder_id INTEGER REFERENCES folders(id) ON DELETE SET NULL",
+        "ALTER TABLE folders ADD COLUMN parent_id INTEGER REFERENCES folders(id) ON DELETE CASCADE",
+    ]:
+        try:
+            conn.execute(stmt)
+        except Exception:
+            pass
     conn.commit()
     conn.close()
 
@@ -213,9 +218,9 @@ def save_history(user_id: int, title: str, source_type: str, source_url: str,
 
 # ---- Folders ----
 
-def create_folder(user_id: int, name: str) -> int:
+def create_folder(user_id: int, name: str, parent_id: int = None) -> int:
     conn = get_conn()
-    cur = conn.execute("INSERT INTO folders (user_id, name) VALUES (?, ?)", (user_id, name))
+    cur = conn.execute("INSERT INTO folders (user_id, name, parent_id) VALUES (?, ?, ?)", (user_id, name, parent_id))
     conn.commit()
     fid = cur.lastrowid
     conn.close()
@@ -224,7 +229,7 @@ def create_folder(user_id: int, name: str) -> int:
 
 def get_folders(user_id: int):
     conn = get_conn()
-    rows = conn.execute("SELECT id, name, created_at FROM folders WHERE user_id=? ORDER BY name", (user_id,)).fetchall()
+    rows = conn.execute("SELECT id, name, parent_id, created_at FROM folders WHERE user_id=? ORDER BY name", (user_id,)).fetchall()
     conn.close()
     return [dict(r) for r in rows]
 
@@ -236,10 +241,16 @@ def rename_folder(user_id: int, folder_id: int, name: str):
     conn.close()
 
 
-def delete_folder(user_id: int, folder_id: int):
+def delete_folder(user_id: int, folder_id: int, delete_items: bool = False):
     conn = get_conn()
-    # Move items out of folder before deleting
-    conn.execute("UPDATE history SET folder_id=NULL WHERE folder_id=? AND user_id=?", (folder_id, user_id))
+    if delete_items:
+        conn.execute("DELETE FROM history WHERE folder_id=? AND user_id=?", (folder_id, user_id))
+    else:
+        conn.execute("UPDATE history SET folder_id=NULL WHERE folder_id=? AND user_id=?", (folder_id, user_id))
+    # Move sub-folders to parent (or root)
+    parent = conn.execute("SELECT parent_id FROM folders WHERE id=? AND user_id=?", (folder_id, user_id)).fetchone()
+    parent_id = parent["parent_id"] if parent else None
+    conn.execute("UPDATE folders SET parent_id=? WHERE parent_id=? AND user_id=?", (parent_id, folder_id, user_id))
     conn.execute("DELETE FROM folders WHERE id=? AND user_id=?", (folder_id, user_id))
     conn.commit()
     conn.close()

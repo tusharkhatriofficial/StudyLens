@@ -546,30 +546,37 @@ function renderHistory(historyItems, standaloneChats) {
     _allFolders.forEach(f => { folderMap[f.id] = {folder: f, items: []}; });
     all.forEach(i => { if (i.folder_id && folderMap[i.folder_id]) folderMap[i.folder_id].items.push(i); });
 
+    // Build folder tree (nested)
+    function renderFolderTree(parentId, depth) {
+        let out = '';
+        const childFolders = _allFolders.filter(f => (f.parent_id || null) === parentId);
+        childFolders.forEach(f => {
+            const items = folderMap[f.id]?.items || [];
+            const isOpen = localStorage.getItem(`studylens-folder-${f.id}`) !== 'closed';
+            out += `<div class="folder-group mb-0.5" data-folder-id="${f.id}">
+                <div class="folder-header group flex items-center gap-2 px-3 py-2.5 rounded-lg cursor-pointer text-sm font-semibold text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                     data-folder-id="${f.id}">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="shrink-0 text-amber-500 transition-transform ${isOpen?'':'rotate-[-90deg]'}"><polyline points="6 9 12 15 18 9"/></svg>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="shrink-0 text-amber-500"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+                    <span class="truncate flex-1">${esc(f.name)}</span>
+                    <span class="text-xs text-gray-400 dark:text-gray-600 font-normal">${items.length}</span>
+                    <button class="folder-menu ml-1 shrink-0 p-1 rounded-md opacity-0 group-hover:opacity-100 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-all">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
+                    </button>
+                </div>
+                <div class="folder-items pl-4 ${isOpen?'':'hidden'}" data-folder-id="${f.id}">
+                    ${renderFolderTree(f.id, depth+1)}
+                    ${items.map(i => renderHistoryRow(i, i._type==='study')).join('')}
+                    ${!items.length && !_allFolders.some(sf => sf.parent_id === f.id) ? '<p class="text-xs text-gray-400 dark:text-gray-600 px-3 py-2">Drag items here</p>' : ''}
+                </div>
+            </div>`;
+        });
+        return out;
+    }
+
     let html = '';
-
-    // Render folders
-    _allFolders.forEach(f => {
-        const items = folderMap[f.id]?.items || [];
-        const isOpen = localStorage.getItem(`studylens-folder-${f.id}`) !== 'closed';
-        html += `<div class="folder-group mb-1" data-folder-id="${f.id}">
-            <div class="folder-header group flex items-center gap-2 px-3 py-2.5 rounded-lg cursor-pointer text-sm font-semibold text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                 data-folder-id="${f.id}">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="shrink-0 text-amber-500 transition-transform ${isOpen?'':'rotate-[-90deg]'}"><polyline points="6 9 12 15 18 9"/></svg>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="shrink-0 text-amber-500"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
-                <span class="truncate flex-1">${esc(f.name)}</span>
-                <span class="text-xs text-gray-400 dark:text-gray-600 font-normal">${items.length}</span>
-                <button class="folder-menu ml-1 shrink-0 p-1 rounded-md opacity-0 group-hover:opacity-100 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-all">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
-                </button>
-            </div>
-            <div class="folder-items pl-4 ${isOpen?'':'hidden'}" data-folder-id="${f.id}">
-                ${items.map(i => renderHistoryRow(i, i._type==='study')).join('')}
-                ${!items.length ? '<p class="text-xs text-gray-400 dark:text-gray-600 px-3 py-2">Drag items here</p>' : ''}
-            </div>
-        </div>`;
-    });
-
+    // Render folder tree starting from root (parent_id = null)
+    html += renderFolderTree(null, 0);
     // Render unfiled items
     html += unfiled.map(i => renderHistoryRow(i, i._type==='study')).join('');
 
@@ -678,6 +685,7 @@ function closeAllMenus() {
     document.querySelectorAll('.hi-dropdown').forEach(m => m.remove());
 }
 
+
 // ---- New Folder ----
 document.getElementById('new-folder-btn')?.addEventListener('click', async () => {
     if (!currentUser) { alert('Login to create folders'); return; }
@@ -691,38 +699,17 @@ document.getElementById('new-folder-btn')?.addEventListener('click', async () =>
     }
 });
 
-function showFolderMenu(btn, folderId, folderName) {
+function showDropdown(anchorEl, html, onReady) {
     closeAllMenus();
     const menu = document.createElement('div');
-    menu.className = 'hi-dropdown absolute right-2 top-full mt-1 z-50 glass-card rounded-xl shadow-lg py-1.5 min-w-[140px]';
-    menu.innerHTML = `
-        <button class="fm-rename flex items-center gap-3 w-full px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-left">Rename</button>
-        <button class="fm-delete flex items-center gap-3 w-full px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors text-left">Delete</button>
-    `;
-    btn.closest('.folder-header').appendChild(menu);
-
-    menu.querySelector('.fm-rename').addEventListener('click', async e => {
-        e.stopPropagation();
-        closeAllMenus();
-        const newName = prompt('Rename folder:', folderName);
-        if (newName && newName.trim() && newName.trim() !== folderName) {
-            await fetch(`/api/folders/${folderId}`, {
-                method:'PATCH', headers:{'Content-Type':'application/json'},
-                body: JSON.stringify({name: newName.trim()})
-            });
-            loadHistory();
-        }
-    });
-
-    menu.querySelector('.fm-delete').addEventListener('click', async e => {
-        e.stopPropagation();
-        closeAllMenus();
-        if (confirm(`Delete folder "${folderName}"? Items inside will be moved out, not deleted.`)) {
-            await fetch(`/api/folders/${folderId}`, {method:'DELETE'});
-            loadHistory();
-        }
-    });
-
+    menu.className = 'hi-dropdown fixed z-[200] glass-card rounded-xl shadow-lg py-1.5 min-w-[160px]';
+    menu.innerHTML = html;
+    document.body.appendChild(menu);
+    // Position near anchor
+    const rect = anchorEl.getBoundingClientRect();
+    menu.style.top = (rect.bottom + 4) + 'px';
+    menu.style.left = Math.min(rect.right - menu.offsetWidth, window.innerWidth - menu.offsetWidth - 8) + 'px';
+    if (onReady) onReady(menu);
     setTimeout(() => {
         document.addEventListener('click', function close(ev) {
             if (!menu.contains(ev.target)) { menu.remove(); document.removeEventListener('click', close); }
@@ -730,15 +717,60 @@ function showFolderMenu(btn, folderId, folderName) {
     }, 10);
 }
 
+function showFolderMenu(btn, folderId, folderName) {
+    showDropdown(btn, `
+        <button class="fm-subfolder flex items-center gap-3 w-full px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-left">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>
+            New Subfolder
+        </button>
+        <button class="fm-rename flex items-center gap-3 w-full px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-left">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            Rename
+        </button>
+        <div class="border-t border-gray-200/60 dark:border-white/[0.06] my-1"></div>
+        <button class="fm-delete-keep flex items-center gap-3 w-full px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-left">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+            Delete folder only
+        </button>
+        <button class="fm-delete-all flex items-center gap-3 w-full px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors text-left">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+            Delete folder + items
+        </button>
+    `, menu => {
+        menu.querySelector('.fm-subfolder').addEventListener('click', async e => {
+            e.stopPropagation(); closeAllMenus();
+            const name = prompt('Subfolder name:');
+            if (name && name.trim()) {
+                await fetch('/api/folders', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name: name.trim(), parent_id: +folderId})});
+                loadHistory();
+            }
+        });
+        menu.querySelector('.fm-rename').addEventListener('click', async e => {
+            e.stopPropagation(); closeAllMenus();
+            const newName = prompt('Rename folder:', folderName);
+            if (newName && newName.trim() && newName.trim() !== folderName) {
+                await fetch(`/api/folders/${folderId}`, {method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name: newName.trim()})});
+                loadHistory();
+            }
+        });
+        menu.querySelector('.fm-delete-keep').addEventListener('click', async e => {
+            e.stopPropagation(); closeAllMenus();
+            if (confirm(`Delete "${folderName}"? Items inside will be moved to root.`)) {
+                await fetch(`/api/folders/${folderId}`, {method:'DELETE'});
+                loadHistory();
+            }
+        });
+        menu.querySelector('.fm-delete-all').addEventListener('click', async e => {
+            e.stopPropagation(); closeAllMenus();
+            if (confirm(`Delete "${folderName}" AND all items inside? This cannot be undone.`)) {
+                await fetch(`/api/folders/${folderId}?delete_items=1`, {method:'DELETE'});
+                loadHistory();
+            }
+        });
+    });
+}
+
 function toggleMenu(btn, id, title, type) {
-    // If menu already open for this button, close it
-    const existing = btn.parentElement.querySelector('.hi-dropdown');
-    if (existing) { existing.remove(); return; }
-
-    closeAllMenus();
-
-    const menu = document.createElement('div');
-    menu.className = 'hi-dropdown absolute right-2 top-full mt-1 z-50 glass-card rounded-xl shadow-lg py-1.5 min-w-[160px]';
     // Build folder move submenu items
     const folderItems = _allFolders.length && type === 'study'
         ? `<div class="border-t border-gray-200/60 dark:border-white/[0.06] my-1"></div>
@@ -753,7 +785,7 @@ function toggleMenu(btn, id, title, type) {
            </button>`).join('')}`
         : '';
 
-    menu.innerHTML = `
+    showDropdown(btn, `
         <button class="menu-rename flex items-center gap-3 w-full px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-left">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
             Rename
@@ -763,59 +795,37 @@ function toggleMenu(btn, id, title, type) {
             Delete
         </button>
         ${folderItems}
-    `;
-    btn.parentElement.appendChild(menu);
-
-    // Rename action
-    menu.querySelector('.menu-rename').addEventListener('click', async (e) => {
-        e.stopPropagation();
-        closeAllMenus();
-        const newTitle = prompt('Rename this item:', title);
-        if (newTitle !== null && newTitle.trim() && newTitle.trim() !== title) {
-            const endpoint = type === 'study' ? `/api/history/${id}` : `/api/standalone-chats/${id}`;
-            await fetch(endpoint, {
-                method: 'PATCH',
-                headers: {'Content-Type':'application/json'},
-                body: JSON.stringify({title: newTitle.trim()})
-            });
-            loadHistory();
-        }
-    });
-
-    // Delete action with confirm
-    menu.querySelector('.menu-delete').addEventListener('click', async (e) => {
-        e.stopPropagation();
-        closeAllMenus();
-        if (confirm('Are you sure you want to delete "' + title + '"? This cannot be undone.')) {
-            const endpoint = type === 'study' ? `/api/history/${id}` : `/api/standalone-chats/${id}`;
-            await fetch(endpoint, {method:'DELETE'});
-            loadHistory();
-        }
-    });
-
-    // Move to folder actions
-    menu.querySelector('.menu-unfolder')?.addEventListener('click', async e => {
-        e.stopPropagation(); closeAllMenus();
-        await fetch(`/api/history/${id}/move`, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({folder_id:null})});
-        loadHistory();
-    });
-    menu.querySelectorAll('.menu-move-folder').forEach(fb => {
-        fb.addEventListener('click', async e => {
+    `, menu => {
+        menu.querySelector('.menu-rename').addEventListener('click', async (e) => {
             e.stopPropagation(); closeAllMenus();
-            await fetch(`/api/history/${id}/move`, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({folder_id:+fb.dataset.fid})});
-            loadHistory();
-        });
-    });
-
-    // Close menu when clicking anywhere else
-    setTimeout(() => {
-        document.addEventListener('click', function closeMenu(ev) {
-            if (!menu.contains(ev.target)) {
-                menu.remove();
-                document.removeEventListener('click', closeMenu);
+            const newTitle = prompt('Rename this item:', title);
+            if (newTitle !== null && newTitle.trim() && newTitle.trim() !== title) {
+                const endpoint = type === 'study' ? `/api/history/${id}` : `/api/standalone-chats/${id}`;
+                await fetch(endpoint, {method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({title: newTitle.trim()})});
+                loadHistory();
             }
         });
-    }, 10);
+        menu.querySelector('.menu-delete').addEventListener('click', async (e) => {
+            e.stopPropagation(); closeAllMenus();
+            if (confirm('Are you sure you want to delete "' + title + '"? This cannot be undone.')) {
+                const endpoint = type === 'study' ? `/api/history/${id}` : `/api/standalone-chats/${id}`;
+                await fetch(endpoint, {method:'DELETE'});
+                loadHistory();
+            }
+        });
+        menu.querySelector('.menu-unfolder')?.addEventListener('click', async e => {
+            e.stopPropagation(); closeAllMenus();
+            await fetch(`/api/history/${id}/move`, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({folder_id:null})});
+            loadHistory();
+        });
+        menu.querySelectorAll('.menu-move-folder').forEach(fb => {
+            fb.addEventListener('click', async e => {
+                e.stopPropagation(); closeAllMenus();
+                await fetch(`/api/history/${id}/move`, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({folder_id:+fb.dataset.fid})});
+                loadHistory();
+            });
+        });
+    });
 }
 
 let currentHistoryId = null;
