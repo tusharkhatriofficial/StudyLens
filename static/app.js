@@ -616,19 +616,51 @@ function renderHistory(historyItems, standaloneChats) {
         el.addEventListener('dragend', () => el.classList.remove('opacity-50'));
     });
 
-    // Drop targets: folders
-    list.querySelectorAll('.folder-group').forEach(fg => {
-        fg.addEventListener('dragover', e => { e.preventDefault(); fg.querySelector('.folder-header').classList.add('!bg-brand-50', 'dark:!bg-brand-500/10'); });
-        fg.addEventListener('dragleave', () => fg.querySelector('.folder-header').classList.remove('!bg-brand-50', 'dark:!bg-brand-500/10'));
-        fg.addEventListener('drop', async e => {
+    // Drop targets: folder headers (not the whole group, to avoid nesting issues)
+    list.querySelectorAll('.folder-header').forEach(hdr => {
+        hdr.addEventListener('dragover', e => {
             e.preventDefault();
-            fg.querySelector('.folder-header').classList.remove('!bg-brand-50', 'dark:!bg-brand-500/10');
+            e.stopPropagation();
+            hdr.classList.add('!bg-brand-50', 'dark:!bg-brand-500/10');
+        });
+        hdr.addEventListener('dragleave', e => {
+            e.stopPropagation();
+            hdr.classList.remove('!bg-brand-50', 'dark:!bg-brand-500/10');
+        });
+        hdr.addEventListener('drop', async e => {
+            e.preventDefault();
+            e.stopPropagation();
+            hdr.classList.remove('!bg-brand-50', 'dark:!bg-brand-500/10');
+            const fid = hdr.dataset.folderId;
             try {
                 const data = JSON.parse(e.dataTransfer.getData('text/plain'));
                 if (data.type === 'study') {
                     await fetch(`/api/history/${data.id}/move`, {
                         method:'POST', headers:{'Content-Type':'application/json'},
-                        body: JSON.stringify({folder_id: +fg.dataset.folderId})
+                        body: JSON.stringify({folder_id: +fid})
+                    });
+                    loadHistory();
+                }
+            } catch {}
+        });
+    });
+
+    // Also allow dropping into the folder-items area (the open body of a folder)
+    list.querySelectorAll('.folder-items').forEach(fi => {
+        fi.addEventListener('dragover', e => {
+            e.preventDefault();
+            e.stopPropagation();
+        });
+        fi.addEventListener('drop', async e => {
+            e.preventDefault();
+            e.stopPropagation();
+            const fid = fi.dataset.folderId;
+            try {
+                const data = JSON.parse(e.dataTransfer.getData('text/plain'));
+                if (data.type === 'study') {
+                    await fetch(`/api/history/${data.id}/move`, {
+                        method:'POST', headers:{'Content-Type':'application/json'},
+                        body: JSON.stringify({folder_id: +fid})
                     });
                     loadHistory();
                 }
@@ -639,7 +671,6 @@ function renderHistory(historyItems, standaloneChats) {
     // Drop on sidebar root = remove from folder
     list.addEventListener('dragover', e => e.preventDefault());
     list.addEventListener('drop', async e => {
-        if (e.target.closest('.folder-group')) return; // handled above
         e.preventDefault();
         try {
             const data = JSON.parse(e.dataTransfer.getData('text/plain'));
