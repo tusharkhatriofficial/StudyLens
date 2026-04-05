@@ -1,110 +1,138 @@
-# StudyLens - Turn Any Video Into Study Notes Instantly
+<div align="center">
 
-**Transform YouTube videos and uploaded lectures into transcripts, summaries, flashcards, quizzes, and more — powered by AI.**
+# StudyLens
 
-StudyLens is a self-hosted, open-source study tool that takes any video (YouTube URL or file upload), transcribes it locally using Whisper AI, and generates rich study materials using your choice of AI provider (OpenAI, Google Gemini, or Anthropic Claude).
+### Turn Any Video Into Complete Study Notes — Instantly
 
----
+[![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![Whisper](https://img.shields.io/badge/Whisper-Local_AI-412991?style=for-the-badge&logo=openai&logoColor=white)](https://github.com/SYSTRAN/faster-whisper)
+[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://docker.com)
+[![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE)
 
-## Why StudyLens?
+**Paste a YouTube link or upload a video. Get transcripts, summaries, quizzes, Q&A, and more.**<br>
+**Transcription runs 100% locally. Only AI generation needs an API key.**
 
-Watching a 2-hour lecture and taking notes manually is painful. StudyLens does it in minutes:
+[Getting Started](#-getting-started) · [Features](#-features) · [How It Works](#-how-it-works) · [API Keys](#-api-key-setup)
 
-- **Paste a YouTube link** or **upload a video file** — that's it
-- Get a full **transcript with timestamps** you can click to jump to that moment
-- AI generates **summary notes, topic breakdowns, Q&A, practice questions, MCQs**, and exhaustive study guides
-- **Chat with your notes** — highlight any text and ask AI to explain it
-- Come back later and **generate more** output types without re-processing the video
-- **Merge multiple videos** into a combined study guide
-
-No note-taking apps, no copy-pasting, no context switching. Just paste and study.
+</div>
 
 ---
 
-## Features
+## The Problem
 
-### Core
-- **YouTube URL or File Upload** — supports any video up to 500MB
-- **Local Transcription** — uses [faster-whisper](https://github.com/SYSTRAN/faster-whisper) (runs on your machine, no audio sent to cloud)
-- **7 Output Types:**
-  - Transcript (with clickable timestamps)
-  - Summary Notes
-  - Main Topics Breakdown
-  - Detailed Q&A (exam prep)
-  - Practice Questions
-  - Multiple Choice Quiz (MCQ)
-  - Exhaustive Notes (full coverage)
+You watch a 2-hour lecture. You take notes. You miss things. You rewatch parts. You spend more time organizing notes than actually studying.
 
-### Study Tools
-- **Generate More** — already generated a transcript + summary? Come back later and add MCQs, Q&A, or any missing type without re-processing
-- **Chat with AI** — highlight any text in your notes and ask questions about it
-- **Full-Screen Chat** — standalone AI chat, optionally referencing a study session
-- **Merge Sessions** — combine transcripts from multiple videos into one study guide
-- **Fullscreen Reader** — distraction-free reading with zoom controls (60%-200%)
+**StudyLens fixes this.** Paste a link, pick what you want, and get study-ready material in minutes — not hours.
 
-### Platform
-- **User Accounts** — register/login to save history, or use as a guest
-- **Multi-Provider AI** — bring your own OpenAI, Google Gemini, or Anthropic API key
-- **Server Default Key** — set a default API key in `.env` so users don't need their own
-- **Rate Limiting** — configurable daily limits for guests and logged-in users
-- **Dark/Light Theme** — automatic or manual toggle
-- **Guided Tour** — interactive onboarding for first-time users
-- **Docker Ready** — one command to deploy
+---
+
+## What You Get
+
+<table>
+<tr>
+<td width="50%">
+
+### From any video, generate:
+
+| Output | What it does |
+|--------|-------------|
+| **Transcript** | Full text with clickable timestamps |
+| **Summary Notes** | Structured, concise study notes |
+| **Main Topics** | Topic-by-topic breakdown with key points |
+| **Detailed Q&A** | Exam-style questions with model answers |
+| **Practice Questions** | Short answer, long answer, and true/false |
+| **MCQ Quiz** | 15-20 multiple choice questions |
+| **Exhaustive Notes** | Every single detail captured |
+
+</td>
+<td width="50%">
+
+### Plus:
+
+| Feature | Description |
+|---------|------------|
+| **Chat with Notes** | Highlight text, ask AI to explain it |
+| **Generate More** | Add new output types later without re-processing |
+| **Merge Sessions** | Combine multiple videos into one study guide |
+| **Fullscreen Reader** | Clean reading view with zoom (60%-200%) |
+| **Dark Mode** | Toggle between light and dark themes |
+| **User Accounts** | Save history, chats, and settings |
+
+</td>
+</tr>
+</table>
+
+---
+
+## How It Works
+
+```
+  YouTube URL / Video File
+          |
+          v
+  yt-dlp + ffmpeg              Extracts audio locally
+          |
+          v
+  faster-whisper               Transcribes on YOUR machine (no cloud)
+          |
+          v
+  LLM API                      Generates study materials
+  (OpenAI / Gemini / Claude)   (only step that needs an API key)
+          |
+          v
+  SQLite                       Saves everything for logged-in users
+```
+
+> **No subscriptions. No monthly fees.** Transcription is fully local using [faster-whisper](https://github.com/SYSTRAN/faster-whisper). The only cost is the LLM API call for generating summaries/quizzes — typically a few cents per video using GPT-4o-mini.
 
 ---
 
 ## Tech Stack
 
-| Layer | Technology |
-|-------|-----------|
-| **Frontend** | Vanilla JS (ES6+), Tailwind CSS, Marked.js |
-| **Backend** | Python, FastAPI, Uvicorn |
-| **Transcription** | faster-whisper (OpenAI Whisper, runs locally) |
-| **AI Generation** | OpenAI GPT-4o-mini / Google Gemini 2.5 Flash / Anthropic Claude Sonnet |
-| **Video Download** | yt-dlp + ffmpeg |
-| **Database** | SQLite (WAL mode) |
-| **Auth** | PBKDF2-HMAC-SHA256 with secure sessions |
+| Component | Technology | Runs Locally? |
+|-----------|-----------|:---:|
+| **Transcription** | [faster-whisper](https://github.com/SYSTRAN/faster-whisper) (Whisper model) | Yes |
+| **Video Download** | [yt-dlp](https://github.com/yt-dlp/yt-dlp) + [ffmpeg](https://ffmpeg.org) | Yes |
+| **AI Generation** | OpenAI `gpt-4o-mini` / Google `gemini-2.5-flash` / Anthropic `claude-sonnet-4-6` | API call |
+| **Backend** | Python, [FastAPI](https://fastapi.tiangolo.com), Uvicorn | Yes |
+| **Frontend** | Vanilla JavaScript, Tailwind CSS, Marked.js | Yes |
+| **Database** | SQLite (WAL mode) | Yes |
+| **Auth** | PBKDF2-HMAC-SHA256, secure httponly cookies | Yes |
+
+Everything runs on your machine except the LLM API calls for generating AI content.
 
 ---
 
-## Quick Start
+## Getting Started
 
 ### Prerequisites
 
-- **Python 3.10+**
-- **ffmpeg** — `brew install ffmpeg` (macOS) / `apt install ffmpeg` (Linux)
-- **An AI API key** (at least one of: OpenAI, Google Gemini, or Anthropic)
+| Requirement | Install |
+|-------------|---------|
+| **Python 3.10+** | [python.org](https://python.org) |
+| **ffmpeg** | `brew install ffmpeg` (macOS) / `apt install ffmpeg` (Linux / WSL) |
+| **An LLM API key** | See [API Key Setup](#-api-key-setup) below |
 
-### 1. Clone and setup
+### 1. Clone
 
 ```bash
 git clone https://github.com/tusharkhatriofficial/study_lense.git
 cd study_lense
 ```
 
-### 2. Configure your API key
+### 2. Add your API key
 
 Create a `.env` file in the project root:
 
 ```env
-# At least one API key is required for AI features (summaries, Q&A, quizzes, etc.)
-# Transcription works without any key (runs locally via Whisper)
+# You need at least ONE key for AI features (summaries, quizzes, Q&A, etc.)
+# Transcription works without any key — it runs fully locally.
 
-OPENAI_API_KEY=sk-your-openai-key-here
+OPENAI_API_KEY=sk-your-key-here
 # GEMINI_API_KEY=your-gemini-key-here
 # ANTHROPIC_API_KEY=your-anthropic-key-here
 ```
-
-**How API keys work:**
-- The `.env` key acts as the **server default** — all users can generate content using it (subject to rate limits)
-- Users can also add their **own API keys** in the Settings page for unlimited usage
-- If no server default key is set, users **must** provide their own key in Settings before using AI features
-- **Transcription does not require an API key** — it runs locally on your machine using Whisper
-
-Get your keys:
-- OpenAI: [platform.openai.com/api-keys](https://platform.openai.com/api-keys)
-- Google Gemini: [aistudio.google.com/apikey](https://aistudio.google.com/apikey)
-- Anthropic: [console.anthropic.com/settings/keys](https://console.anthropic.com/settings/keys)
 
 ### 3. Run
 
@@ -113,12 +141,9 @@ chmod +x run.sh
 ./run.sh
 ```
 
-Open **http://localhost:8000** in your browser.
+Open **http://localhost:8000** and you're ready to go.
 
-The first run will:
-- Create a Python virtual environment
-- Install all dependencies
-- Download the Whisper `base` model (~150MB, one-time)
+> First run downloads the Whisper `base` model (~150MB) and installs Python dependencies. This is a one-time setup.
 
 ### Docker
 
@@ -127,104 +152,150 @@ docker build -t studylens .
 docker run -p 8000:8000 --env-file .env -v ./data:/app/data studylens
 ```
 
-The `data/` volume persists your SQLite database (user accounts, history, chats) across container restarts.
+Mount `data/` to persist the SQLite database (accounts, history, chats) across restarts.
 
 ---
 
-## How It Works
+## API Key Setup
 
-```
-YouTube URL / Video File
-        │
-        ▼
-   yt-dlp / ffmpeg          ← Downloads video, extracts audio (16kHz mono WAV)
-        │
-        ▼
-   faster-whisper            ← Local transcription (no cloud, your machine)
-        │
-        ▼
-   AI Provider               ← Generates study materials from transcript
-   (OpenAI / Gemini /          (runs in parallel for speed)
-    Anthropic)
-        │
-        ▼
-   SQLite Database           ← Saves everything for logged-in users
-        │
-        ▼
-   Study Dashboard           ← Tabs for each output type, chat, reader
-```
+StudyLens needs an LLM API key **only for generating AI content** (summaries, quizzes, Q&A, etc.). Transcription is fully local and free.
 
----
+### Where to get a key
 
-## Rate Limits (Default)
+| Provider | Model Used | Get Key |
+|----------|-----------|---------|
+| **OpenAI** | `gpt-4o-mini` | [platform.openai.com/api-keys](https://platform.openai.com/api-keys) |
+| **Google Gemini** | `gemini-2.5-flash` | [aistudio.google.com/apikey](https://aistudio.google.com/apikey) |
+| **Anthropic** | `claude-sonnet-4-6` | [console.anthropic.com/settings/keys](https://console.anthropic.com/settings/keys) |
 
-When using the server's default API key:
+You only need **one** key. Pick whichever provider you prefer.
 
-| User Type | Processing Limit | Chat Limit |
-|-----------|-----------------|------------|
+### How keys work in StudyLens
+
+| Setup | What happens |
+|-------|-------------|
+| **Key in `.env` file** | Acts as the server default. All users can use it (with rate limits). |
+| **Key in Settings page** | Users add their own key in-app. Overrides the server default. No rate limits. |
+| **No key at all** | Transcription still works. AI features ask the user to add a key in Settings. |
+
+### Rate limits (when using the server default key)
+
+| User Type | Video Processing | AI Chat |
+|-----------|:---:|:---:|
 | Guest (no account) | 3/day | 5/day |
 | Logged-in user | 20/day | 30/day |
-| User with own API key | Unlimited | Unlimited |
+| Using own API key | Unlimited | Unlimited |
+
+---
+
+## Features in Detail
+
+<details>
+<summary><strong>Generate More</strong> — add output types later without re-processing</summary>
+
+<br>
+
+Generated only a transcript and summary? Open that session from history, and you'll see checkboxes for every output type you haven't generated yet (MCQ, Q&A, Topics, etc.). Check what you want and hit Go. StudyLens uses the saved transcript — no need to re-download or re-transcribe the video.
+
+</details>
+
+<details>
+<summary><strong>Chat with Notes</strong> — highlight text and ask AI about it</summary>
+
+<br>
+
+In any study session, highlight text in your notes. A tooltip appears letting you ask AI about the selection. The AI has full context of your transcript and all generated outputs, so answers are specific to your content.
+
+There's also a standalone full-screen chat that can optionally reference any study session.
+
+</details>
+
+<details>
+<summary><strong>Merge Sessions</strong> — combine multiple videos into one guide</summary>
+
+<br>
+
+Select 2 or more study sessions from your history and merge them. StudyLens combines all transcripts (labeled by source) and generates new study materials from the combined content. Great for combining lecture series or related videos.
+
+</details>
+
+<details>
+<summary><strong>Multi-Provider AI</strong> — choose your preferred LLM</summary>
+
+<br>
+
+StudyLens auto-detects the provider from your API key format:
+- Keys starting with `sk-` → OpenAI (`gpt-4o-mini`)
+- Keys starting with `AIza` → Google Gemini (`gemini-2.5-flash`)
+- Keys starting with `sk-ant-` → Anthropic Claude (`claude-sonnet-4-6`)
+
+You can set a different key per provider in Settings and switch between them.
+
+</details>
 
 ---
 
 ## Project Structure
 
 ```
-studyLens/
+study_lense/
 ├── backend/
-│   ├── main.py           # FastAPI app — all API endpoints
-│   ├── db.py             # SQLite database layer
-│   ├── downloader.py     # YouTube download + audio extraction
-│   ├── transcriber.py    # Whisper transcription
-│   └── summarizer.py     # Multi-provider AI content generation
+│   ├── main.py           # FastAPI — all API endpoints, SSE progress, auth
+│   ├── db.py             # SQLite — users, history, chats, usage tracking
+│   ├── downloader.py     # yt-dlp + ffmpeg — download & extract audio
+│   ├── transcriber.py    # faster-whisper — local transcription
+│   └── summarizer.py     # Multi-provider LLM — content generation
 ├── static/
-│   ├── index.html        # Single-page app HTML
-│   ├── app.js            # Frontend logic
-│   └── style.css         # Tailwind + custom styles
+│   ├── index.html        # Single-page app
+│   ├── app.js            # Frontend logic (vanilla JS)
+│   └── style.css         # Tailwind CSS + custom styles
 ├── data/                  # SQLite database (gitignored)
-├── .env                   # API keys (gitignored)
+├── .env                   # Your API keys (gitignored)
 ├── Dockerfile
 ├── requirements.txt
-└── run.sh                # Local dev startup script
+└── run.sh
 ```
 
 ---
 
-## API Endpoints
+## API Reference
 
 <details>
-<summary>Click to expand full API reference</summary>
+<summary>Click to expand</summary>
 
-### Processing
+### Video Processing
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `POST` | `/api/process` | Process a video (YouTube URL or file upload) |
-| `GET` | `/api/status/{task_id}` | SSE stream for real-time progress |
+| `POST` | `/api/process` | Process a YouTube URL or uploaded video file |
+| `GET` | `/api/status/{task_id}` | SSE stream — real-time progress updates |
 
-### History
+### Study Sessions
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/api/history` | List all study sessions |
-| `GET` | `/api/history/{id}` | Get a specific study session |
-| `PATCH` | `/api/history/{id}` | Rename a study session |
-| `DELETE` | `/api/history/{id}` | Delete a study session |
+| `GET` | `/api/history` | List all saved study sessions |
+| `GET` | `/api/history/{id}` | Get full session (transcript, outputs, metadata) |
 | `POST` | `/api/history/{id}/generate-more` | Generate additional output types |
+| `PATCH` | `/api/history/{id}` | Rename a session |
+| `DELETE` | `/api/history/{id}` | Delete a session |
+| `POST` | `/api/merge` | Merge multiple sessions into one |
 
 ### Chat
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `POST` | `/api/history/{id}/chats` | Create a chat within a study session |
-| `POST` | `/api/chats/{id}/message` | Send a message to an existing chat |
-| `POST` | `/api/standalone-chat` | Full-screen chat (optionally referencing a session) |
+| `GET` | `/api/history/{id}/chats` | List chats for a study session |
+| `POST` | `/api/history/{id}/chats` | Start a new chat (with optional text selection) |
+| `POST` | `/api/chats/{id}/message` | Send message to existing chat |
+| `POST` | `/api/standalone-chat` | Full-screen chat (optionally references a session) |
 
-### Other
+### Auth & Settings
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `POST` | `/api/merge` | Merge multiple study sessions |
 | `POST` | `/api/register` | Create account |
 | `POST` | `/api/login` | Login |
-| `GET` | `/api/health` | Health check |
+| `POST` | `/api/logout` | Logout |
+| `GET` | `/api/me` | Get current user |
+| `POST` | `/api/keys` | Save an API key |
+| `GET` | `/api/health` | Health check (also reports if a default key is configured) |
 
 </details>
 
@@ -232,9 +303,7 @@ studyLens/
 
 ## Contributing
 
-Contributions are welcome! Feel free to open issues or submit pull requests.
-
----
+Contributions welcome. Open an issue or submit a PR.
 
 ## License
 
@@ -242,4 +311,8 @@ MIT
 
 ---
 
+<div align="center">
+
 Built by [Tushar Khatri](https://tusharkhatri.in)
+
+</div>
