@@ -299,29 +299,67 @@ function showResults(data) {
     if (data.segments?.length) currentResults._segments = data.segments;
     document.getElementById('results-section').classList.remove('hidden');
     document.getElementById('progress-section').classList.add('hidden');
-    buildTabs('results-tabs', 'result-body', currentResults);
+    buildTabs('results-tabs', 'result-body', currentResults, data.duration);
 }
 
-function buildTabs(tabContainerId, bodyId, outputs) {
+function buildTabs(tabContainerId, bodyId, outputs, videoDuration) {
     const tc = document.getElementById(tabContainerId);
     const keys = Object.keys(outputs).filter(k => !k.startsWith('_'));
     tc.innerHTML = '';
     if (!keys.length) { document.getElementById(bodyId).innerHTML = '<p class="text-gray-400">No results.</p>'; return; }
+
+    const activeClass = 'px-4 py-2 text-sm font-semibold rounded-lg gradient-btn text-white whitespace-nowrap';
+    const inactiveClass = 'px-4 py-2 text-sm font-medium rounded-lg text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white whitespace-nowrap transition-colors';
+
     keys.forEach((key,i) => {
         const btn = document.createElement('button');
-        btn.className = i===0
-            ? 'px-4 py-2 text-sm font-semibold rounded-lg gradient-btn text-white whitespace-nowrap'
-            : 'px-4 py-2 text-sm font-medium rounded-lg text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white whitespace-nowrap transition-colors';
-        btn.textContent = tabLabels[key]||key;
+        btn.className = i===0 ? activeClass : inactiveClass;
+        const readMins = calcReadTime(outputs[key] || '');
+        btn.innerHTML = `${tabLabels[key]||key} <span class="opacity-60 text-[10px] ml-0.5">${fmtDuration(readMins)}</span>`;
         btn.dataset.key = key;
         btn.addEventListener('click', () => {
-            tc.querySelectorAll('button').forEach(b => { b.className='px-4 py-2 text-sm font-medium rounded-lg text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white whitespace-nowrap transition-colors'; });
-            btn.className='px-4 py-2 text-sm font-semibold rounded-lg gradient-btn text-white whitespace-nowrap';
+            tc.querySelectorAll('button').forEach(b => { b.className = inactiveClass; });
+            btn.className = activeClass;
             renderContent(bodyId, key, outputs);
         });
         tc.appendChild(btn);
     });
+
+    // Time saved banner
+    showTimeSaved(tabContainerId, outputs, videoDuration);
+
     renderContent(bodyId, keys[0], outputs);
+}
+
+function showTimeSaved(tabContainerId, outputs, videoDuration) {
+    // Remove any existing banner for this section
+    const existingId = tabContainerId + '-time-saved';
+    const existing = document.getElementById(existingId);
+    if (existing) existing.remove();
+
+    if (!videoDuration || videoDuration <= 0) return;
+
+    const videoMins = Math.ceil(videoDuration / 60);
+    const keys = Object.keys(outputs).filter(k => !k.startsWith('_'));
+    const totalReadMins = keys.reduce((sum, k) => sum + calcReadTime(outputs[k] || ''), 0);
+    // Average read time (reading one output, not all — user reads the summary, not everything)
+    const avgReadMins = Math.max(1, Math.round(totalReadMins / keys.length));
+    const saved = videoMins - avgReadMins;
+
+    if (saved <= 0) return;
+
+    const banner = document.createElement('div');
+    banner.id = existingId;
+    banner.className = 'flex items-center gap-3 mt-2 px-4 py-2 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200/60 dark:border-emerald-500/20 text-sm';
+    banner.innerHTML = `
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-emerald-500 shrink-0"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        <span class="text-emerald-700 dark:text-emerald-300">
+            <strong>${fmtDuration(videoMins)}</strong> video &rarr; <strong>${fmtDuration(avgReadMins)}</strong> avg read &mdash;
+            you save ~<strong>${fmtDuration(saved)}</strong> per output
+        </span>`;
+
+    const tc = document.getElementById(tabContainerId);
+    tc.parentNode.insertBefore(banner, tc.nextSibling);
 }
 
 function renderContent(bodyId, key, outputs) {
@@ -342,6 +380,20 @@ function renderMd(text) {
 }
 function fmtTime(s) { return Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0'); }
 function esc(t) { const d=document.createElement('div'); d.textContent=t; return d.innerHTML; }
+
+// ==================== Read Time ====================
+function calcReadTime(text) {
+    if (!text) return 0;
+    const words = text.trim().split(/\s+/).length;
+    return Math.max(1, Math.ceil(words / 200)); // 200 wpm average
+}
+function fmtDuration(mins) {
+    if (mins < 1) return '< 1 min';
+    if (mins < 60) return mins + ' min';
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    return m > 0 ? `${h}h ${m}m` : `${h}h`;
+}
 
 // ==================== Copy & Download ====================
 function setupActions() {
@@ -536,7 +588,7 @@ async function openHistory(id) {
         if (data.segments?.length) outputs._segments = data.segments;
         rawOutputs = outputs;
         currentResults = outputs;
-        buildTabs('history-tabs','history-body', outputs);
+        buildTabs('history-tabs','history-body', outputs, data.duration);
         // Show YouTube embed
         showYouTubeEmbed(data.source_url);
         // Show chat FAB
@@ -1178,7 +1230,8 @@ function openFullscreenReader(html) {
         transcript:'Transcript', summary_notes:'Summary Notes', main_topics:'Main Topics',
         detailed_qa:'Detailed Q&A', practice_qa:'Practice Set', mcq:'MCQ Quiz', exhaustive:'Everything'
     })[currentTab] || 'Reading Mode') : 'Reading Mode';
-    title.textContent = activeTab;
+    const readMins = currentTab && rawOutputs[currentTab] ? calcReadTime(rawOutputs[currentTab]) : 0;
+    title.innerHTML = activeTab + (readMins ? ` <span class="text-sm font-normal text-gray-400 dark:text-gray-500 ml-2">${fmtDuration(readMins)} read</span>` : '');
 
     body.innerHTML = html;
     // Keep zoom from previous session
