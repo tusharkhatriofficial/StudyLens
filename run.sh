@@ -44,6 +44,11 @@ source venv/bin/activate
 echo "Installing dependencies..."
 pip install -q -r requirements.txt
 
+# Install mlx-whisper on Apple Silicon Macs for GPU-accelerated transcription
+if [ "$(uname)" = "Darwin" ] && [ "$(uname -m)" = "arm64" ]; then
+    pip install -q mlx-whisper 2>/dev/null && echo "  Installed mlx-whisper (Apple Silicon GPU acceleration)" || true
+fi
+
 echo ""
 echo "========================================="
 echo "  StudyLens running on http://localhost:8000"
