@@ -1293,9 +1293,11 @@ async function openMergeModal() {
         }
         list.innerHTML = items.map(item => {
             const title = item.title || 'Video';
-            return `<label class="flex items-center gap-3 px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-brand-400 cursor-pointer transition-colors">
-                <input type="checkbox" value="${item.id}" class="merge-check accent-brand-500 w-4 h-4">
-                <span class="text-base text-gray-700 dark:text-gray-300 truncate">${esc(title)}</span>
+            const dur = item.duration ? ` · ${fmtDuration(Math.ceil(item.duration / 60))}` : '';
+            return `<label class="flex items-center gap-3 px-4 py-3.5 rounded-xl border border-gray-200/60 dark:border-white/[0.08] bg-white/40 dark:bg-white/[0.03] hover:border-brand-400 hover:bg-brand-50/50 dark:hover:bg-brand-500/5 cursor-pointer transition-all">
+                <input type="checkbox" value="${item.id}" class="merge-check accent-brand-500 w-4 h-4 shrink-0">
+                <span class="text-sm font-medium text-gray-700 dark:text-gray-300 truncate">${esc(title)}</span>
+                <span class="ml-auto text-xs text-gray-400 dark:text-gray-500 shrink-0">${item.source_type === 'youtube' ? 'YouTube' : 'Upload'}${dur}</span>
             </label>`;
         }).join('');
     } catch {}
