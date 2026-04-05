@@ -38,24 +38,24 @@ def resolve_provider_and_key(api_key: str = None, provider: str = None):
     return None, None
 
 
-async def _call(api_key: str, system: str, prompt: str, provider: str = None) -> str:
+async def _call(api_key: str, system: str, prompt: str, provider: str = None, max_tokens: int = 4096) -> str:
     """Route to the right provider."""
     prov, key = resolve_provider_and_key(api_key, provider)
     if not key:
         return "**No API key configured.** Add one in Settings."
 
     if prov == "gemini":
-        return await _call_gemini(key, system, prompt)
+        return await _call_gemini(key, system, prompt, max_tokens)
     elif prov == "anthropic":
-        return await _call_anthropic(key, system, prompt)
+        return await _call_anthropic(key, system, prompt, max_tokens)
     else:
-        return await _call_openai(key, system, prompt)
+        return await _call_openai(key, system, prompt, max_tokens)
 
 
-async def _call_openai(api_key: str, system: str, prompt: str) -> str:
+async def _call_openai(api_key: str, system: str, prompt: str, max_tokens: int = 4096) -> str:
     client = AsyncOpenAI(api_key=api_key)
     resp = await client.chat.completions.create(
-        model="gpt-4o-mini", temperature=0.3, max_tokens=4096,
+        model="gpt-4o-mini", temperature=0.3, max_tokens=max_tokens,
         messages=[
             {"role": "system", "content": system},
             {"role": "user", "content": prompt},
@@ -64,21 +64,23 @@ async def _call_openai(api_key: str, system: str, prompt: str) -> str:
     return resp.choices[0].message.content
 
 
-async def _call_gemini(api_key: str, system: str, prompt: str) -> str:
+async def _call_gemini(api_key: str, system: str, prompt: str, max_tokens: int = 4096) -> str:
     from google import genai
+    from google.genai import types
     client = genai.Client(api_key=api_key)
     resp = await client.aio.models.generate_content(
         model="gemini-2.5-flash",
         contents=f"{system}\n\n{prompt}",
+        config=types.GenerateContentConfig(max_output_tokens=max_tokens),
     )
     return resp.text
 
 
-async def _call_anthropic(api_key: str, system: str, prompt: str) -> str:
+async def _call_anthropic(api_key: str, system: str, prompt: str, max_tokens: int = 4096) -> str:
     import anthropic
     client = anthropic.AsyncAnthropic(api_key=api_key)
     resp = await client.messages.create(
-        model="claude-sonnet-4-6", max_tokens=4096, temperature=0.3,
+        model="claude-sonnet-4-6", max_tokens=max_tokens, temperature=0.3,
         system=system,
         messages=[{"role": "user", "content": prompt}],
     )
@@ -147,7 +149,7 @@ async def generate_detailed_notes_qa(transcript: str, api_key: str = None, provi
     return await _call(api_key,
         "You are an expert educator creating comprehensive exam preparation material. Use markdown.",
         f"Create EXTREMELY detailed study notes with Q&A from this transcript.\n\nInclude:\n1. **Detailed Notes** — every concept explained thoroughly with examples\n2. **Possible Exam Questions & Answers** — for EACH topic, list questions an examiner could ask and provide model answers\n3. **Key Definitions** — glossary of important terms\n4. **Common Mistakes** — pitfalls students should avoid\n\nBe thorough. Cover everything. This is exam prep material.\n\nTRANSCRIPT:\n{transcript[:TRANSCRIPT_LIMIT]}\n\nDETAILED NOTES & Q&A:",
-        provider)
+        provider, max_tokens=16384)
 
 
 async def generate_practice_qa(transcript: str, api_key: str = None, provider: str = None, **kw) -> str:
@@ -166,9 +168,9 @@ async def generate_mcq(transcript: str, api_key: str = None, provider: str = Non
 
 async def generate_exhaustive_notes(transcript: str, api_key: str = None, provider: str = None, **kw) -> str:
     return await _call(api_key,
-        "You are an obsessively thorough note-taker and educator. Capture EVERY SINGLE piece of information. Use markdown.",
-        f"Create EXHAUSTIVE, incredibly detailed notes from this transcript. Capture absolutely everything.\n\nRULES:\n- Document EVERY concept, fact, example, analogy, story, aside, and remark\n- If the speaker mentioned it, it goes in the notes\n- Organize into clear sections with ## headings\n- Under each section, use nested bullet points for details\n- Include exact numbers, names, dates, formulas, and quotes\n- Add a \"Key Definitions\" section at the end\n- Add a \"Timeline / Flow\" section showing order of topics\n- This should be a COMPLETE replacement for watching the video\n\nTRANSCRIPT:\n{transcript[:TRANSCRIPT_LIMIT]}\n\nEXHAUSTIVE NOTES:",
-        provider)
+        "You are an obsessively thorough note-taker and educator. Your job is to produce notes so detailed and complete that the reader NEVER needs to watch the original video. Do NOT summarize — expand, elaborate, and capture everything. Use markdown.",
+        f"Create EXHAUSTIVE, incredibly detailed notes from this transcript. Your output should be LONGER than a summary — not shorter.\n\nCRITICAL RULES:\n- Document EVERY concept, fact, example, analogy, story, aside, anecdote, and remark\n- If the speaker mentioned it, it MUST appear in the notes — no exceptions\n- Do NOT skip anything because it seems minor or tangential\n- Explain each concept thoroughly — include context, reasoning, and implications\n- Use ## headings for major sections, ### for subsections\n- Use nested bullet points with full sentences, not fragments\n- Include exact numbers, names, dates, formulas, quotes, and references\n- If the speaker gives an example, reproduce it fully — don't just say \"the speaker gave an example\"\n- If the speaker tells a story or anecdote, retell it completely\n- Add a \"Key Definitions\" section at the end\n- Add a \"Timeline / Flow\" section showing the order of topics covered\n- The goal: someone reading these notes gets 100% of the information from the video\n- Use as much space as you need — thoroughness is more important than brevity\n\nTRANSCRIPT:\n{transcript[:TRANSCRIPT_LIMIT]}\n\nEXHAUSTIVE NOTES:",
+        provider, max_tokens=16384)
 
 
 GENERATORS = {
