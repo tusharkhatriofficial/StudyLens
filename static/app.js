@@ -603,6 +603,19 @@ async function doGenerateMore(historyId) {
     btn.querySelector('.gm-text').classList.add('hidden');
     btn.querySelector('.gm-loader').classList.remove('hidden');
 
+    // Disable checkboxes while generating
+    document.querySelectorAll('.gm-check').forEach(c => c.disabled = true);
+
+    function resetGenerateMoreBtn() {
+        const b = document.getElementById('generate-more-go');
+        if (b) {
+            b.disabled = false;
+            b.querySelector('.gm-text').classList.remove('hidden');
+            b.querySelector('.gm-loader').classList.add('hidden');
+        }
+        document.querySelectorAll('.gm-check').forEach(c => c.disabled = false);
+    }
+
     try {
         const resp = await fetch(`/api/history/${historyId}/generate-more`, {
             method: 'POST', headers: {'Content-Type':'application/json'},
@@ -614,6 +627,7 @@ async function doGenerateMore(historyId) {
         const es = new EventSource(`/api/status/${data.task_id}`);
         es.onmessage = (event) => {
             const d = JSON.parse(event.data);
+            if (d.error && !d.status) { es.close(); alert(d.error); resetGenerateMoreBtn(); return; }
             if (d.status === 'done') {
                 es.close();
                 openHistory(historyId); // Reload to show new outputs
@@ -621,16 +635,14 @@ async function doGenerateMore(historyId) {
             if (d.status === 'error') {
                 es.close();
                 alert(d.error || 'Error');
+                resetGenerateMoreBtn();
             }
         };
-        es.onerror = () => es.close();
+        es.onerror = () => { es.close(); resetGenerateMoreBtn(); };
     } catch (err) {
         alert(err.message);
+        resetGenerateMoreBtn();
     }
-
-    btn.disabled = false;
-    btn.querySelector('.gm-text').classList.remove('hidden');
-    btn.querySelector('.gm-loader').classList.add('hidden');
 }
 document.getElementById('history-back')?.addEventListener('click', () => {
     showView('generator-view');
