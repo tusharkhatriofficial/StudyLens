@@ -479,26 +479,26 @@ async def merge_sessions(request: Request):
     options = body.get("options", ["summary_notes"])
     mcq_options = int(body.get("mcq_options", 4))
     title = body.get("title", "").strip()
+    mode = body.get("mode", "regenerate")  # "combine" or "regenerate"
 
     if len(history_ids) < 2:
         raise HTTPException(400, "Select at least 2 study sessions to merge")
 
-    # Get API key
-    user_keys = db.get_api_keys(user["id"])
-    api_key = user_keys.get("openai") or user_keys.get("gemini") or user_keys.get("anthropic") or ""
-    _, api_key = resolve_provider_and_key(api_key)
-    if not api_key:
-        raise HTTPException(400, "No API key. Add one in Settings.")
-
-    # Gather all transcripts
-    all_transcripts = []
-    source_titles = []
+    # Gather all session data
+    all_items = []
     for hid in history_ids:
         item = db.get_history_item(user["id"], int(hid))
-        if item and item.get("transcript"):
-            all_transcripts.append(item["transcript"])
-            source_titles.append(item.get("title") or f"Video {hid}")
+        if item:
+            all_items.append(item)
 
+    if not all_items:
+        raise HTTPException(400, "No sessions found")
+
+    source_titles = [it.get("title") or f"Video {it['id']}" for it in all_items]
+    source_urls = [it.get("source_url", "") for it in all_items]
+
+    # Build combined transcript
+    all_transcripts = [it["transcript"] for it in all_items if it.get("transcript")]
     if not all_transcripts:
         raise HTTPException(400, "No transcripts found in selected sessions")
 
@@ -511,17 +511,51 @@ async def merge_sessions(request: Request):
         if len(source_titles) > 3:
             title += f" +{len(source_titles)-3} more"
 
-    # Create task for progress tracking
+    # Store source info for the merged session
+    merge_meta = json.dumps({"source_ids": history_ids, "source_urls": source_urls, "source_titles": source_titles})
+
+    if mode == "combine":
+        # Combine Only: just stitch together existing outputs, no AI calls
+        outputs = {}
+        if "transcript" in options:
+            outputs["transcript"] = combined_transcript
+        for opt in options:
+            if opt == "transcript":
+                continue
+            parts = []
+            for it in all_items:
+                it_outputs = it.get("outputs", {})
+                if it_outputs.get(opt):
+                    parts.append(f"## {it.get('title') or 'Video'}\n\n{it_outputs[opt]}")
+            if parts:
+                outputs[opt] = "\n\n---\n\n".join(parts)
+
+        total_duration = sum(it.get("duration", 0) for it in all_items)
+        history_id = db.save_history(
+            user["id"], title, "merge", merge_meta,
+            combined_transcript, [], outputs, options, total_duration, "",
+        )
+        return {"history_id": history_id, "mode": "combine"}
+
+    # Regenerate mode: use AI to create new content from combined transcript
+    api_key = ""
+    user_keys = db.get_api_keys(user["id"])
+    api_key = user_keys.get("openai") or user_keys.get("gemini") or user_keys.get("anthropic") or ""
+    _, api_key = resolve_provider_and_key(api_key)
+    if not api_key:
+        raise HTTPException(400, "No API key. Add one in Settings.")
+
     task_id = str(uuid.uuid4())[:8]
+    total_duration = sum(it.get("duration", 0) for it in all_items)
     tasks[task_id] = {"status": "processing", "progress": 10, "stage": "generating", "user_id": user["id"]}
 
     asyncio.create_task(_merge_pipeline(
-        task_id, user["id"], combined_transcript, options, mcq_options, api_key, title, history_ids
+        task_id, user["id"], combined_transcript, options, mcq_options, api_key, title, merge_meta, total_duration
     ))
-    return {"task_id": task_id}
+    return {"task_id": task_id, "mode": "regenerate"}
 
 
-async def _merge_pipeline(task_id, user_id, transcript, options, mcq_options, api_key, title, source_ids):
+async def _merge_pipeline(task_id, user_id, transcript, options, mcq_options, api_key, title, merge_meta, total_duration):
     try:
         outputs = {}
         gen_options = [o for o in options if o != "transcript"]
@@ -551,10 +585,9 @@ async def _merge_pipeline(task_id, user_id, transcript, options, mcq_options, ap
                 done += 1
                 tasks[task_id]["progress"] = 20 + int((done / total) * 70)
 
-        import json as _json
         history_id = db.save_history(
-            user_id, title, "merge", _json.dumps(source_ids),
-            transcript, [], outputs, options, 0, "",
+            user_id, title, "merge", merge_meta,
+            transcript, [], outputs, options, total_duration, "",
         )
 
         tasks[task_id].update(

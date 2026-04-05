@@ -589,8 +589,50 @@ async function openHistory(id) {
         rawOutputs = outputs;
         currentResults = outputs;
         buildTabs('history-tabs','history-body', outputs, data.duration);
-        // Show YouTube embed
-        showYouTubeEmbed(data.source_url);
+
+        // Handle merged vs single session display
+        const mergeBadge = document.getElementById('history-merge-badge');
+        const sourceVideos = document.getElementById('history-source-videos');
+
+        if (data.source_type === 'merge') {
+            // Show merge badge
+            let meta = {};
+            try { meta = typeof data.source_url === 'string' ? JSON.parse(data.source_url) : {}; } catch {}
+            const srcTitles = meta.source_titles || [];
+            const srcUrls = meta.source_urls || [];
+            const count = srcTitles.length || meta.source_ids?.length || 0;
+
+            mergeBadge.classList.remove('hidden');
+            document.getElementById('merge-badge-text').textContent =
+                `Merged from ${count} session${count !== 1 ? 's' : ''}`;
+
+            // Show source videos if any have YouTube URLs
+            const ytSources = srcUrls.map((url, i) => ({url, title: srcTitles[i] || `Video ${i+1}`})).filter(s => s.url && (s.url.includes('youtube.com') || s.url.includes('youtu.be')));
+
+            if (ytSources.length) {
+                sourceVideos.classList.remove('hidden');
+                document.getElementById('source-videos-label').textContent = `Source Videos (${ytSources.length})`;
+                document.getElementById('source-videos-list').innerHTML = ytSources.map(s => {
+                    let videoId = '';
+                    try { const u = new URL(s.url); videoId = u.searchParams.get('v') || u.pathname.split('/').pop(); } catch {}
+                    if (!videoId || videoId.length < 5) return '';
+                    return `<div class="rounded-xl overflow-hidden border border-gray-200/40 dark:border-white/[0.06]">
+                        <div class="px-4 py-2 bg-gray-50/50 dark:bg-white/[0.02] text-xs font-medium text-gray-600 dark:text-gray-400 truncate">${esc(s.title)}</div>
+                        <iframe width="100%" height="200" src="https://www.youtube.com/embed/${videoId}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen loading="lazy" class="bg-black"></iframe>
+                    </div>`;
+                }).join('');
+            } else {
+                sourceVideos.classList.add('hidden');
+            }
+
+            // Hide single video embed for merged sessions
+            document.getElementById('history-video').classList.add('hidden');
+        } else {
+            mergeBadge.classList.add('hidden');
+            sourceVideos.classList.add('hidden');
+            showYouTubeEmbed(data.source_url);
+        }
+
         // Show chat FAB
         document.getElementById('chat-fab').classList.remove('hidden');
         // Load saved chats
@@ -1267,10 +1309,27 @@ function showYouTubeEmbed(sourceUrl) {
 }
 
 // ==================== Merge Sessions ====================
+let mergeMode = 'combine';
+
 function setupMerge() {
     document.getElementById('merge-btn').addEventListener('click', openMergeModal);
     document.getElementById('merge-close').addEventListener('click', () => document.getElementById('merge-modal').classList.add('hidden'));
     document.getElementById('merge-go').addEventListener('click', doMerge);
+
+    // Mode toggle
+    document.querySelectorAll('.merge-mode-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            mergeMode = btn.dataset.mode;
+            document.querySelectorAll('.merge-mode-btn').forEach(b => {
+                b.className = b.dataset.mode === mergeMode
+                    ? 'merge-mode-btn flex-1 px-4 py-2.5 rounded-xl border border-brand-500 bg-brand-50 dark:bg-brand-500/10 text-brand-600 dark:text-brand-400 text-sm font-semibold transition-all'
+                    : 'merge-mode-btn flex-1 px-4 py-2.5 rounded-xl border border-gray-200/60 dark:border-white/[0.08] text-gray-500 dark:text-gray-400 text-sm font-medium transition-all hover:border-brand-400';
+            });
+            // Update button text
+            const goText = document.querySelector('#merge-go .merge-text');
+            goText.textContent = mergeMode === 'combine' ? 'Combine Sessions' : 'Merge & Generate';
+        });
+    });
 
     // Close on backdrop click
     document.getElementById('merge-modal').addEventListener('click', e => {
@@ -1286,7 +1345,7 @@ async function openMergeModal() {
     try {
         const resp = await fetch('/api/history');
         const data = await resp.json();
-        const items = (data.history || []).filter(h => h.source_type !== 'merge'); // don't show merged items
+        const items = data.history || [];
         if (!items.length) {
             list.innerHTML = '<p class="text-sm text-gray-400">No study sessions yet. Generate some first!</p>';
             return;
@@ -1294,10 +1353,11 @@ async function openMergeModal() {
         list.innerHTML = items.map(item => {
             const title = item.title || 'Video';
             const dur = item.duration ? ` · ${fmtDuration(Math.ceil(item.duration / 60))}` : '';
+            const typeLabel = item.source_type === 'merge' ? 'Merged' : item.source_type === 'youtube' ? 'YouTube' : 'Upload';
             return `<label class="flex items-center gap-3 px-4 py-3.5 rounded-xl border border-gray-200/60 dark:border-white/[0.08] bg-white/40 dark:bg-white/[0.03] hover:border-brand-400 hover:bg-brand-50/50 dark:hover:bg-brand-500/5 cursor-pointer transition-all">
                 <input type="checkbox" value="${item.id}" class="merge-check accent-brand-500 w-4 h-4 shrink-0">
                 <span class="text-sm font-medium text-gray-700 dark:text-gray-300 truncate">${esc(title)}</span>
-                <span class="ml-auto text-xs text-gray-400 dark:text-gray-500 shrink-0">${item.source_type === 'youtube' ? 'YouTube' : 'Upload'}${dur}</span>
+                <span class="ml-auto text-xs text-gray-400 dark:text-gray-500 shrink-0">${typeLabel}${dur}</span>
             </label>`;
         }).join('');
     } catch {}
@@ -1323,16 +1383,24 @@ async function doMerge() {
                 options: options,
                 title: document.getElementById('merge-title').value.trim(),
                 mcq_options: 4,
+                mode: mergeMode,
             }),
         });
         if (!resp.ok) { const e = await resp.json(); throw new Error(e.detail || 'Failed'); }
         const data = await resp.json();
 
-        // Close modal, track progress
         document.getElementById('merge-modal').classList.add('hidden');
-        showView('generator-view');
-        document.getElementById('progress-section').classList.remove('hidden');
-        trackProgress(data.task_id);
+
+        if (data.mode === 'combine') {
+            // No async task — data is ready, go straight to history item
+            await loadHistory();
+            openHistory(data.history_id);
+        } else {
+            // Regenerate mode — track async progress
+            showView('generator-view');
+            document.getElementById('progress-section').classList.remove('hidden');
+            trackProgress(data.task_id);
+        }
     } catch (err) {
         alert(err.message);
     }

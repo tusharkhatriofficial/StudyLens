@@ -1,7 +1,7 @@
 import os
 from openai import AsyncOpenAI
 
-TRANSCRIPT_LIMIT = 15000
+TRANSCRIPT_LIMIT = 100000  # ~25k words — well within context limits of gpt-4o-mini (128k), gemini-2.5-flash (1M), claude-sonnet (200k)
 
 # ===================== Multi-Provider AI Client =====================
 

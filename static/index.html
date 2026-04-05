@@ -409,11 +409,31 @@
                         <div id="history-chats-list" class="flex flex-wrap gap-2"></div>
                     </div>
 
-                    <!-- Embedded YouTube player -->
+                    <!-- Merged session badge -->
+                    <div id="history-merge-badge" class="hidden mb-4">
+                        <div class="flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-purple-50 dark:bg-purple-500/10 border border-purple-200/60 dark:border-purple-500/20 text-sm">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-purple-500 shrink-0"><path d="M16 3h5v5"/><path d="M8 3H3v5"/><path d="M12 22v-8.3a4 4 0 00-1.172-2.872L3 3"/><path d="m21 3-7.828 7.828A4 4 0 0012 13.7V22"/></svg>
+                            <span id="merge-badge-text" class="text-purple-700 dark:text-purple-300">Merged session</span>
+                        </div>
+                    </div>
+
+                    <!-- Embedded YouTube player (single video) -->
                     <div id="history-video" class="mb-5 hidden">
                         <div class="rounded-2xl overflow-hidden border border-gray-200/60 dark:border-white/[0.06] shadow-sm">
                             <iframe id="history-video-iframe" width="100%" height="360" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen class="bg-black"></iframe>
                         </div>
+                    </div>
+
+                    <!-- Source videos for merged sessions -->
+                    <div id="history-source-videos" class="hidden mb-5">
+                        <details class="glass-card rounded-2xl border border-gray-200/40 dark:border-white/[0.06] overflow-hidden">
+                            <summary class="flex items-center gap-2.5 px-5 py-3.5 cursor-pointer hover:bg-gray-50/50 dark:hover:bg-white/[0.02] transition-colors text-sm font-semibold text-gray-700 dark:text-gray-300 select-none">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-brand-500"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="m10 9 5 3-5 3z"/></svg>
+                                <span id="source-videos-label">Source Videos</span>
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="ml-auto transition-transform"><polyline points="6 9 12 15 18 9"/></svg>
+                            </summary>
+                            <div id="source-videos-list" class="px-5 pb-4 grid gap-3"></div>
+                        </details>
                     </div>
 
                     <!-- Generate More bar -->
@@ -606,7 +626,20 @@
 
                 <input id="merge-title" type="text" placeholder="Custom title (optional)" class="w-full px-4 py-3 rounded-xl glass-input text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 mb-5">
 
-                <h4 class="text-xs font-semibold uppercase tracking-wider mb-3 text-gray-400 dark:text-gray-500">Generate</h4>
+                <!-- Merge Mode Toggle -->
+                <h4 class="text-xs font-semibold uppercase tracking-wider mb-3 text-gray-400 dark:text-gray-500">Mode</h4>
+                <div class="flex gap-2 mb-5" id="merge-mode-toggle">
+                    <button data-mode="combine" class="merge-mode-btn flex-1 px-4 py-2.5 rounded-xl border border-brand-500 bg-brand-50 dark:bg-brand-500/10 text-brand-600 dark:text-brand-400 text-sm font-semibold transition-all">
+                        <span class="block font-semibold">Combine Only</span>
+                        <span class="block text-[10px] opacity-70 mt-0.5 font-normal">Stitch existing outputs — no AI cost</span>
+                    </button>
+                    <button data-mode="regenerate" class="merge-mode-btn flex-1 px-4 py-2.5 rounded-xl border border-gray-200/60 dark:border-white/[0.08] text-gray-500 dark:text-gray-400 text-sm font-medium transition-all hover:border-brand-400">
+                        <span class="block font-semibold">Regenerate with AI</span>
+                        <span class="block text-[10px] opacity-70 mt-0.5 font-normal">New content from combined transcript</span>
+                    </button>
+                </div>
+
+                <h4 class="text-xs font-semibold uppercase tracking-wider mb-3 text-gray-400 dark:text-gray-500">Include</h4>
                 <div class="flex flex-wrap gap-2 mb-2" id="merge-options">
                     <label class="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-200/60 dark:border-white/[0.08] bg-white/40 dark:bg-white/[0.03] cursor-pointer hover:border-brand-400 transition-colors text-sm">
                         <input type="checkbox" value="transcript" class="accent-brand-500 w-3.5 h-3.5"> <span class="text-gray-700 dark:text-gray-300">Transcript</span>
@@ -635,7 +668,7 @@
             <!-- Footer -->
             <div class="px-7 py-5 border-t border-gray-200/40 dark:border-white/[0.06]">
                 <button id="merge-go" class="w-full py-3.5 rounded-xl gradient-btn text-white font-semibold text-base disabled:opacity-50 shadow-lg shadow-brand-500/20 hover:shadow-brand-500/30 transition-shadow">
-                    <span class="merge-text">Merge & Generate</span>
+                    <span class="merge-text">Combine Sessions</span>
                     <span class="merge-loader hidden"><span class="inline-block w-5 h-5 border-2 border-white/30 border-t-white rounded-full loader"></span></span>
                 </button>
             </div>
@@ -666,6 +699,6 @@
         <div id="tour-highlight" class="absolute z-[5] border-2 border-brand-400 rounded-2xl shadow-[0_0_0_4000px_rgba(0,0,0,0.55)] pointer-events-none transition-all duration-300" style="display:none"></div>
     </div>
 
-    <script src="/static/app.js?v=4"></script>
+    <script src="/static/app.js?v=5"></script>
 </body>
 </html>
