@@ -119,14 +119,11 @@ cd study_lense
 
 **Step 2:** Create a `.env` file with your API key
 
-```env
-# You need at least ONE key for AI features (summaries, quizzes, Q&A, etc.)
-# Transcription works without any key — it runs fully locally.
-
-OPENAI_API_KEY=sk-your-key-here
-# GEMINI_API_KEY=your-gemini-key-here
-# ANTHROPIC_API_KEY=your-anthropic-key-here
+```bash
+cp .env.example .env
 ```
+
+Open `.env` and uncomment + fill in at least one key. See [API Key Setup](#-api-key-setup) for details.
 
 **Step 3:** Start it
 
@@ -157,7 +154,7 @@ git clone https://github.com/tusharkhatriofficial/study_lense.git
 cd study_lense
 ```
 
-Create the `.env` file (same as above), then:
+Create the `.env` file (`cp .env.example .env` and add your key), then:
 
 ```bash
 chmod +x run.sh
