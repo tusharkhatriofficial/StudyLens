@@ -276,10 +276,22 @@ const stageLabels = {
 let activeTaskId = null;
 let activeES = null;
 
+function updateProgressBanner() {
+    const section = document.getElementById('progress-section');
+    const note = document.getElementById('progress-note');
+    if (activeTaskId) {
+        section.classList.remove('hidden');
+        const queueInfo = batchQueue.length ? ` — ${batchQueue.length} more in queue` : '';
+        note.textContent = `You can browse other pages — processing continues in the background.${queueInfo}`;
+    } else {
+        section.classList.add('hidden');
+    }
+}
+
 function trackProgress(taskId) {
     activeTaskId = taskId;
     localStorage.setItem('studylens-active-task', taskId);
-    document.getElementById('progress-section').classList.remove('hidden');
+    updateProgressBanner();
     document.getElementById('results-section').classList.add('hidden');
 
     // Bind stop button
@@ -296,7 +308,8 @@ function trackProgress(taskId) {
         if (d.error && !d.status) { es.close(); alert(d.error); onTaskDone(); return; }
         document.getElementById('progress-fill').style.width = (d.progress||0)+'%';
         document.getElementById('progress-pct').textContent = (d.progress||0)+'%';
-        document.getElementById('progress-stage').textContent = stageLabels[d.stage]||d.stage;
+        const queueLabel = batchQueue.length ? ` (${batchQueue.length} more queued)` : '';
+        document.getElementById('progress-stage').textContent = (stageLabels[d.stage]||d.stage) + queueLabel;
         if (d.status==='done') { es.close(); showResults(d); onTaskDone(); loadHistory(); processBatchQueue(); }
         if (d.status==='error') { es.close(); alert(d.error||'Error'); onTaskDone(); processBatchQueue(); }
         if (d.status==='cancelled') { es.close(); onTaskDone(); processBatchQueue(); }
@@ -307,6 +320,8 @@ function trackProgress(taskId) {
 async function cancelTask(taskId) {
     await fetch(`/api/task/${taskId}`, {method:'DELETE'});
     if (activeES) { activeES.close(); activeES = null; }
+    batchQueue = [];
+    saveBatchQueue();
     onTaskDone();
 }
 
@@ -315,7 +330,7 @@ function onTaskDone() {
     activeES = null;
     localStorage.removeItem('studylens-active-task');
     resetBtn();
-    document.getElementById('progress-section').classList.add('hidden');
+    updateProgressBanner();
 }
 
 async function resumeActiveTasks() {
@@ -980,21 +995,8 @@ async function doGenerateMore(historyId) {
 
     const btn = document.getElementById('generate-more-go');
     btn.disabled = true;
-    btn.querySelector('.gm-text').classList.add('hidden');
-    btn.querySelector('.gm-loader').classList.remove('hidden');
-
-    // Disable checkboxes while generating
+    btn.querySelector('.gm-text').textContent = 'Generating...';
     document.querySelectorAll('.gm-check').forEach(c => c.disabled = true);
-
-    function resetGenerateMoreBtn() {
-        const b = document.getElementById('generate-more-go');
-        if (b) {
-            b.disabled = false;
-            b.querySelector('.gm-text').classList.remove('hidden');
-            b.querySelector('.gm-loader').classList.add('hidden');
-        }
-        document.querySelectorAll('.gm-check').forEach(c => c.disabled = false);
-    }
 
     try {
         const resp = await fetch(`/api/history/${historyId}/generate-more`, {
@@ -1003,25 +1005,43 @@ async function doGenerateMore(historyId) {
         });
         if (!resp.ok) { const e = await resp.json(); throw new Error(e.detail || 'Failed'); }
         const data = await resp.json();
-        // Track progress then reload
+
+        // Use the global progress banner
+        activeTaskId = data.task_id;
+        updateProgressBanner();
+
         const es = new EventSource(`/api/status/${data.task_id}`);
+        activeES = es;
         es.onmessage = (event) => {
             const d = JSON.parse(event.data);
-            if (d.error && !d.status) { es.close(); alert(d.error); resetGenerateMoreBtn(); return; }
+            if (d.error && !d.status) { es.close(); alert(d.error); activeTaskId = null; updateProgressBanner(); resetGMBtn(); return; }
+            document.getElementById('progress-fill').style.width = (d.progress||0)+'%';
+            document.getElementById('progress-pct').textContent = (d.progress||0)+'%';
+            document.getElementById('progress-stage').textContent = 'Generating more...';
             if (d.status === 'done') {
                 es.close();
-                openHistory(historyId); // Reload to show new outputs
+                activeTaskId = null; activeES = null;
+                updateProgressBanner();
+                openHistory(historyId);
             }
             if (d.status === 'error') {
                 es.close();
                 alert(d.error || 'Error');
-                resetGenerateMoreBtn();
+                activeTaskId = null; activeES = null;
+                updateProgressBanner();
+                resetGMBtn();
             }
         };
-        es.onerror = () => { es.close(); resetGenerateMoreBtn(); };
+        es.onerror = () => { es.close(); activeTaskId = null; updateProgressBanner(); resetGMBtn(); };
     } catch (err) {
         alert(err.message);
-        resetGenerateMoreBtn();
+        resetGMBtn();
+    }
+
+    function resetGMBtn() {
+        const b = document.getElementById('generate-more-go');
+        if (b) { b.disabled = false; b.querySelector('.gm-text').textContent = 'Go'; }
+        document.querySelectorAll('.gm-check').forEach(c => c.disabled = false);
     }
 }
 document.getElementById('history-back')?.addEventListener('click', () => {
@@ -1798,13 +1818,22 @@ function endTour() {
 }
 
 // ==================== Batch Queue ====================
-let batchQueue = []; // [{url, options}]
+let batchQueue = [];
+
+function saveBatchQueue() {
+    if (batchQueue.length) localStorage.setItem('studylens-batch-queue', JSON.stringify(batchQueue));
+    else localStorage.removeItem('studylens-batch-queue');
+}
+
+function loadBatchQueue() {
+    try { batchQueue = JSON.parse(localStorage.getItem('studylens-batch-queue') || '[]'); } catch { batchQueue = []; }
+}
 
 function setupBatchQueue() {
+    loadBatchQueue();
     const urlInput = document.getElementById('url-input');
     const addBtn = document.getElementById('add-to-queue-btn');
 
-    // Show "add another" button when URL is entered
     urlInput.addEventListener('input', () => {
         addBtn.classList.toggle('hidden', !urlInput.value.trim());
     });
@@ -1821,6 +1850,7 @@ function setupBatchQueue() {
             return;
         }
         batchQueue.push(url);
+        saveBatchQueue();
         urlInput.value = '';
         addBtn.classList.add('hidden');
         renderBatchQueue();
@@ -1842,16 +1872,19 @@ function renderBatchQueue() {
 
 function removeBatchItem(i) {
     batchQueue.splice(i, 1);
+    saveBatchQueue();
     renderBatchQueue();
 }
 
 function processBatchQueue() {
     if (!batchQueue.length) {
         document.getElementById('batch-section').classList.add('hidden');
+        saveBatchQueue();
         return;
     }
 
     const nextUrl = batchQueue.shift();
+    saveBatchQueue();
     renderBatchUI();
 
     // Auto-submit the next URL
