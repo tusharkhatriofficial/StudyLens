@@ -1612,6 +1612,8 @@ function closeFullscreenReader() {
     document.getElementById('fs-reader').classList.add('hidden');
     document.getElementById('fs-chat-panel').classList.add('hidden');
     document.body.style.overflow = '';
+    // Reload chats so any new fullscreen chats appear in the main view
+    if (currentHistoryId) loadChatsForHistory(currentHistoryId);
 }
 
 // ==================== Fullscreen Chat ====================
