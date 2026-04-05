@@ -559,7 +559,7 @@ async def _merge_pipeline(task_id, user_id, transcript, options, mcq_options, ap
 
         tasks[task_id].update(
             status="done", stage="complete", progress=100,
-            outputs=outputs, transcript=transcript, segments=[],
+            outputs=outputs, segments=[],
             history_id=history_id,
         )
     except Exception as e:
