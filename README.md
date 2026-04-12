@@ -19,6 +19,11 @@
 
 ---
 
+<img width="1552" height="932" alt="Screenshot 2026-04-12 at 5 57 17 PM" src="https://github.com/user-attachments/assets/1664e4bb-a161-494a-bd21-d769c4dfd53e" />
+<img width="1552" height="932" alt="Screenshot 2026-04-12 at 5 56 07 PM" src="https://github.com/user-attachments/assets/def253f0-fdd6-43db-be4a-2571188fb6d0" />
+<img width="1552" height="932" alt="Screenshot 2026-04-12 at 5 56 36 PM" src="https://github.com/user-attachments/assets/53f4de1b-82d7-45d2-83c0-9fa786efe4c8" />
+
+
 ## The Problem
 
 You watch a 2-hour lecture. You take notes. You miss things. You rewatch parts. You spend more time organizing notes than actually studying.
